@@ -1,0 +1,20 @@
+name = "git2prompt-prompt"
+main = "index.mjs"
+compatibility_date = "2024-06-01"
+
+routes = [
+  { pattern = "prompt.git2promptapi.com", custom_domain = true }
+]
+
+
+[vars]
+GITHUB_SEARCH_TOKEN = "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"
+
+[[kv_namespaces]]
+binding = "PROMPT_CACHE"
+id = "8095328372564b7cbf68b3fedf9e69b5"
+
+[[kv_namespaces]]
+binding = "visitor_count_kv"
+id = "031d4108727c4c81af3f3834506a29bb"
+preview_id = "031d4108727c4c81af3f3834506a29bb"
