@@ -1,0 +1,11 @@
+name = "git2prompt-queryhistory"
+main = "index.js"
+compatibility_date = "2024-06-01"
+
+routes = [
+  { pattern = "queryhistory.git2promptapi.com", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "query_history_kv"
+id = "f92997cf09224faeb76424c29fa4e4a8"

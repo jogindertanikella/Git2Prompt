@@ -5,15 +5,32 @@ const ALLOWED_ORIGINS = [
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*", // or origin if needed: ALLOWED_ORIGINS.includes(origin) ? origin : ""
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+      "Access-Control-Allow-Headers": "Content-Type",
     };
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    // Debug endpoint: list all prompts
+    if (request.method === "GET" && url.pathname === "/api/all-prompts") {
+      const list = await env.PROMPT_CACHE.list();
+      const data = {};
+      for (const entry of list.keys) {
+        const value = await env.PROMPT_CACHE.get(entry.name);
+        data[entry.name] = value;
+      }
+      return new Response(JSON.stringify(data, null, 2), {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      });
     }
 
     if (request.method !== "POST") {
@@ -62,7 +79,6 @@ export default {
       readmeText = "Error fetching README.";
     }
 
-    // Generate prompt
     const promptToLLM = `You are a senior software engineer working with the Cursor code editor.
 
 Analyze the GitHub repo at ${repoUrl}.
@@ -77,8 +93,7 @@ Please generate a Cursor-compatible prompt that:
 2. Proposes a modular folder structure.
 3. Suggests any improvements or missing components.
 4. If the project is incomplete, scaffold an MVP structure with placeholder components.
-5. Write this as a prompt someone can paste into Cursor to get to work immediately.
-`;
+5. Write this as a prompt someone can paste into Cursor to get to work immediately.`;
 
     let generatedPrompt = "⚠️ No response from model.";
     try {
@@ -106,7 +121,6 @@ Please generate a Cursor-compatible prompt that:
         generatedPrompt = JSON.stringify(result, null, 2);
       }
 
-      // Save to KV for future use
       await env.PROMPT_CACHE.put(cacheKey, generatedPrompt);
     } catch (err) {
       console.error("Cohere error:", err);
@@ -119,5 +133,5 @@ Please generate a Cursor-compatible prompt that:
         ...corsHeaders,
       },
     });
-  }
+  },
 };

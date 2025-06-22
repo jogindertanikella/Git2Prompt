@@ -1,24 +1,27 @@
-import { useEffect, useState } from "react";
-
-const baseCategories = [
-  { name: "AI / ML", stack: ["topic:tensorflow", "topic:pytorch", "topic:scikit-learn", "topic:fastapi", "topic:pandas"] },
-  { name: "Web Dev", stack: ["topic:react", "topic:nextjs", "topic:express", "topic:tailwindcss", "topic:nodejs"] },
-  { name: "DevOps / CI/CD", stack: ["topic:docker", "topic:github-actions", "topic:kubernetes", "topic:helm", "topic:terraform"] },
-  { name: "Security", stack: ["topic:oauth", "topic:owasp", "topic:keycloak", "topic:snyk"] },
-  { name: "Database", stack: ["topic:postgresql", "topic:mongodb", "topic:mysql", "topic:redis"] },
-  { name: "Mobile", stack: ["topic:flutter", "topic:react-native", "topic:kotlin", "topic:swift"] }
-];
-
-const categories = [{ name: "Random", stack: baseCategories.flatMap(c => c.stack) }, ...baseCategories];
-const starOptions = [0, 100, 500, 1000, 5000];
+import { useEffect, useRef, useState } from "react";
+import { fallbackRepos } from "./constants/fallbackRepos";
+import { baseCategories } from "./constants/baseCategories";
+import { API_URLS } from "./constants/apicalls";
+import { fetchSpinCount } from "./utils/fetchSpinCount";
+import { fetchRepos } from "./utils/fetchRepos";
+import { handlePrompt } from "./utils/handlePrompt";
+import { spin } from "./utils/spin";
+import { timeAgo } from "./utils/timeAgo";
+import { uiuxoptions } from "./constants/uiuxoptions";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useRotatingQuery } from "./utils/useRotatingQuery";
+import { useTypingEffect } from "./utils/useTypingEffect";
+import { isValidGithubUrl } from "./utils/isValidGithubUrl";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [stars, setStars] = useState(0);
-  const [tags, setTags] = useState([]);
-  const [repos, setRepos] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [repos, setRepos] = useState(fallbackRepos);
   const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [spinCount, setSpinCount] = useState(null);
   const [rateLimit, setRateLimit] = useState(null);
   const [modalPrompt, setModalPrompt] = useState("");
@@ -26,187 +29,281 @@ export default function App() {
   const [disabledRepoId, setDisabledRepoId] = useState(null);
   const [hoveredRepoId, setHoveredRepoId] = useState(null);
 
+  const inputRef = useRef(null);
+
+  const categories = [
+    { name: "Random", stack: baseCategories.flatMap((c) => c.stack) },
+    ...baseCategories,
+  ];
+  const starOptions = [0, 100, 500, 1000, 5000];
+
+  const rotatingQuery = useRotatingQuery();
+  const typedQuery = useTypingEffect(rotatingQuery, uiuxoptions.enableTypingEffect);
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
 
   useEffect(() => {
-    fetchSpinCount();
+    fetchSpinCount(setSpinCount);
   }, []);
 
-  const fetchSpinCount = async () => {
-    try {
-      const res = await fetch("https://search.git2promptapi.com");
-      const data = await res.json();
-      setSpinCount(data.spins);
-    } catch {
-      setSpinCount(null);
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === "/" && document.activeElement !== inputRef.current) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        triggerSearch(searchQuery);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [searchQuery]);
+
+  const triggerSearch = async (query) => {
+    const clean = query?.trim();
+    if (!clean || clean.length < 3) return;
+
+    if (isValidGithubUrl(clean)) {
+      try {
+        setSearchLoading(true);
+        await handlePrompt({
+          id: `manual-${Date.now()}`,
+          url: clean,
+          setDisabledRepoId,
+          setModalPrompt,
+          setShowModal,
+        });
+      } catch (err) {
+        toast.error("⚠️ Failed to generate prompt.");
+      } finally {
+        setSearchLoading(false);
+      }
+      return;
     }
-  };
 
-  const spin = () => {
-    const stack = categories[categoryIndex].stack;
-    const selected = Array.from({ length: 5 }, () => stack[Math.floor(Math.random() * stack.length)]);
-    setTags(selected);
-    fetchRepos(selected);
-  };
-
-  const fetchRepos = async (tags) => {
-    setLoading(true);
-    const query = [...new Set(tags)].join(" ");
-    const params = new URLSearchParams({ q: query, ...(stars > 0 ? { stars } : {}) });
+    setSearchQuery(clean);
+    setSearchLoading(true);
 
     try {
-      const res = await fetch(`https://search.git2promptapi.com?${params}`);
-      const data = await res.json();
-      setRepos(data.items || []);
-      setRateLimit(data.rate || null);
-    } catch {
-      setRepos([]);
-    }
-
-    setLoading(false);
-  };
-
-  const handlePrompt = async (id, url) => {
-    setDisabledRepoId(id);
-    try {
-      const res = await fetch("https://prompt.git2promptapi.com/", {
+      await fetchRepos({ query: clean, stars, setRepos, setRateLimit, setLoading: setSearchLoading });
+      await fetch(`${API_URLS.QUERY}/api/store-query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ query: clean }),
       });
-
-      const data = await res.json();
-      setModalPrompt(data.prompt || "⚠️ Failed to fetch prompt.");
-      setShowModal(true);
-    } catch {
-      setModalPrompt("⚠️ Error generating prompt.");
-      setShowModal(true);
+    } catch (err) {
+      console.error("Search error:", err);
+    } finally {
+      setSearchLoading(false);
     }
-    setDisabledRepoId(null);
   };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-black dark:bg-zinc-900 dark:text-white px-4 py-6">
-      <header className="flex items-center justify-between max-w-5xl mx-auto mb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <img src="/images/git2prompt.png" className="w-12 h-12 rounded-lg" alt="Logo" />
-          Git2Prompt&nbsp;
-        </h1>
+      <header className="flex items-center justify-between max-w-6xl mx-auto mb-6">
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <img src="/images/git2prompt.png" className="w-12 h-12 rounded-lg" alt="Logo" />
+            Git2Prompt
+          </h1>
+        </div>
         <button
           onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
-          className="text-2xl"
+          className="text-2xl ml-6"
         >
           {theme === "dark" ? "🌙" : "☀️"}
         </button>
       </header>
 
-      <div className="text-center text-sm mb-4">
-        🎯 {spinCount !== null ? `${spinCount.toLocaleString()} spins and counting!` : "Loading..."}
-      </div>
-
-      <div className="flex flex-wrap justify-center gap-4 mb-6">
-        <select
-          value={categoryIndex}
-          onChange={(e) => setCategoryIndex(Number(e.target.value))}
-          className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-4 py-2 rounded"
-        >
-          {categories.map((c, i) => (
-            <option key={c.name} value={i}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={stars}
-          onChange={(e) => setStars(Number(e.target.value))}
-          className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-4 py-2 rounded"
-        >
-          {starOptions.map((s) => (
-            <option key={s} value={s}>
-              {s === 0 ? "Any Stars" : `${s}+ Stars`}
-            </option>
-          ))}
-        </select>
-
-<button
-  onClick={spin}
-  className="btn-shimmer bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full font-bold"
->
-  🎲 Roll
-</button>
-
-
-      </div>
-
-      {loading ? (
-        <p className="text-center">🔄 Fetching repositories...</p>
-      ) : repos.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {repos.map((repo) => (
-            <div
-              key={repo.id}
-              className="bg-zinc-100 dark:bg-zinc-800 p-5 rounded-xl shadow-md relative"
-              onMouseEnter={() => setHoveredRepoId(repo.id)}
-              onMouseLeave={() => setHoveredRepoId(null)}
+      <div className="w-full flex flex-col items-center mb-6 px-4">
+        <div className="relative w-full max-w-3xl">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="🔍 Ask anything... or paste a GitHub repo URL"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-6 py-3 pr-20 rounded-full bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border border-zinc-300 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-12 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-red-500 text-xl"
             >
-              <h2 className="text-blue-600 dark:text-blue-400 font-semibold text-lg truncate">
-                {repo.full_name}
-              </h2>
-              <p className="text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2 min-h-[3em]">
-                {repo.description || "No description"}
-              </p>
-              <div className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">⭐ {repo.stargazers_count.toLocaleString()}</div>
-              <div className="mt-3 flex gap-2">
-                <a
-                  href={repo.html_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-emerald-600 px-3 py-1 rounded text-sm hover:bg-emerald-700 text-white"
-                >
-                  GitHub ↗
-                </a>
-                <button
-                  disabled={!!disabledRepoId}
-                  onClick={() => handlePrompt(repo.id, repo.html_url)}
-                  className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
-                    disabledRepoId === repo.id
-                      ? "bg-yellow-400 text-black"
-                      : "bg-yellow-500 text-black hover:bg-yellow-400"
-                  }`}
-                >
-                  {disabledRepoId === repo.id ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                      </svg>
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      🧠 Git2Prompt
-                    </>
-                  )}
-                </button>
-              </div>
+              ❌
+            </button>
+          )}
+          <button
+            disabled={searchLoading || loading || !searchQuery.trim()}
+            onClick={() => triggerSearch(searchQuery)}
+            className={`absolute right-4 top-1/2 transform -translate-y-1/2 text-xl ${
+              searchLoading ? "animate-pulse" : ""
+            }`}
+          >
+            {searchLoading ? "⏳" : "🚀"}
+          </button>
+        </div>
 
-              {hoveredRepoId === repo.id && repo.description && (
-                <div className="absolute inset-0 bg-black bg-opacity-80 text-white p-4 rounded-xl z-10 overflow-auto">
-                  <p className="text-sm">{repo.description}</p>
-                </div>
-              )}
-            </div>
+        <p className="text-center text-sm mt-2 text-zinc-500 dark:text-zinc-400">
+          💡 Try:{" "}
+          <span
+            onClick={() => triggerSearch(rotatingQuery)}
+            className="italic text-blue-500 cursor-pointer hover:underline"
+          >
+            "{typedQuery}"
+          </span>
+        </p>
+
+
+<div className="mt-4 flex justify-center gap-4">
+  <button
+    disabled={searchLoading || loading}
+    onClick={() => {
+      const selectedCategory = categories[categoryIndex];
+      const randomTerm = selectedCategory.stack[Math.floor(Math.random() * selectedCategory.stack.length)];
+      const starLabel = stars === 0 ? "any" : `${stars}+`;
+
+      setSearchQuery(`${randomTerm} | stars: ${starLabel}`);
+      spin({ categoryIndex, categories, stars, setRepos, setRateLimit, setLoading });
+    }}
+    className={`${
+      searchLoading || loading ? "opacity-50 cursor-not-allowed" : ""
+    } btn-shimmer bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full text-sm font-medium`}
+  >
+    {loading ? "⏳ Rolling..." : "🎲 Surprise me!"}
+  </button>
+</div>
+
+
+        <div className="flex gap-2 mt-4">
+          {starOptions.map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                if (!searchQuery.trim()) return;
+                setStars(s);
+                triggerSearch(searchQuery);
+              }}
+              className={`px-3 py-1 rounded-full border text-sm ${
+                stars === s
+                  ? "bg-yellow-500 text-black font-semibold"
+                  : "bg-zinc-200 dark:bg-zinc-700 text-black dark:text-white"
+              }`}
+            >
+              {s === 0 ? "⭐ Any" : `⭐ ${s}+`}
+            </button>
           ))}
         </div>
-      ) : (
-        <p className="text-center text-zinc-500">😕 No repositories found for your tags and filters.</p>
+      </div>
+
+      {spinCount !== null && (
+        <div className="text-center text-sm mb-4 text-zinc-400">
+          🎯 {spinCount.toLocaleString()} spins and counting!
+        </div>
       )}
 
-      {rateLimit && (
+      <div
+        className={`relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto transition-all duration-200 ${
+          loading || searchLoading ? "opacity-40 pointer-events-none blur-sm" : ""
+        }`}
+      >
+        {repos.map((repo) => (
+          <div
+            key={repo.id}
+            className="bg-zinc-100 dark:bg-zinc-800 p-5 rounded-xl shadow-md relative"
+            onMouseEnter={() => setHoveredRepoId(repo.id)}
+            onMouseLeave={() => setHoveredRepoId(null)}
+          >
+            <h2 className="text-blue-600 dark:text-blue-400 font-semibold text-lg truncate">
+              {repo.full_name}
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2 min-h-[3em]">
+              {repo.description || "No description"}
+            </p>
+            <div className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
+              ⭐ {repo.stargazers_count.toLocaleString()}
+              {repo.fromAPI && repo.updated_at && uiuxoptions.showFreshness && (
+                <span className="ml-2 text-xs text-zinc-500">
+                  • {timeAgo(repo.updated_at)}
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex gap-2 z-20 relative">
+              <a
+                href={repo.html_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-emerald-600 px-3 py-1 rounded text-sm hover:bg-emerald-700 text-white"
+              >
+                GitHub ↗
+              </a>
+              <button
+                disabled={!!disabledRepoId}
+                onClick={() =>
+                  handlePrompt({
+                    id: repo.id,
+                    url: repo.html_url,
+                    setDisabledRepoId,
+                    setModalPrompt,
+                    setShowModal,
+                  })
+                }
+                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                  disabledRepoId === repo.id
+                    ? "bg-yellow-400 text-black"
+                    : "bg-yellow-500 text-black hover:bg-yellow-400"
+                }`}
+              >
+                {disabledRepoId === repo.id ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4 mr-1"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8H4z"
+                      />
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <img
+                      src="/images/git2prompt.png"
+                      alt="Git2Prompt"
+                      className="w-4 h-4 mr-1 rounded-lg"
+                    />
+                    Git2Prompt
+                  </>
+                )}
+              </button>
+            </div>
+
+            {hoveredRepoId === repo.id && repo.description && (
+              <div className="absolute inset-0 bg-zinc-900/90 text-white p-4 rounded-xl z-10 overflow-y-auto overflow-x-hidden backdrop-blur-md">
+                <p className="text-sm whitespace-pre-line">{repo.description}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {rateLimit && uiuxoptions.showRateLimit && (
         <p className="text-center text-xs text-zinc-400 mt-4">
           ⏱ GitHub API: {rateLimit.remaining} left – resets at{" "}
           {new Date(rateLimit.reset * 1000).toLocaleTimeString()}
@@ -214,50 +311,65 @@ export default function App() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white text-black rounded-lg p-6 w-full max-w-lg">
-            <h3 className="text-xl font-bold mb-2">Generated Prompt</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50">
+          <div className="bg-white dark:bg-zinc-900 text-black dark:text-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 relative transition-all duration-300 ease-out scale-95 opacity-0 animate-fadeIn">
+            <h3 className="text-2xl font-bold mb-4">📋 Generated Prompt</h3>
+
             <textarea
               readOnly
-              className="w-full h-40 border p-2 rounded"
+              className="w-full h-64 p-4 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none resize-none"
               value={modalPrompt}
             />
-            <div className="mt-4 flex justify-between">
+
+            <div className="flex justify-between items-center mt-6">
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(modalPrompt);
-                  alert("✅ Prompt copied!");
+                  toast.success("✅ Prompt copied!");
                 }}
-                className="bg-blue-600 text-white px-4 py-1 rounded"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-sm font-medium shadow"
               >
-                📋 Copy
+                📎 Copy Prompt
               </button>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-zinc-600 underline"
+                className="text-sm text-zinc-500 hover:underline"
               >
                 Close
               </button>
             </div>
+
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xl text-zinc-600 dark:text-white hover:scale-105 transition"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
 
-      <footer className="mt-auto text-center text-sm text-zinc-600 dark:text-zinc-400 backdrop-blur-sm bg-white/80 dark:bg-zinc-900/80 w-full py-4 sticky bottom-0">
+      <ToastContainer position="top-center" autoClose={1500} hideProgressBar theme={theme} />
+
+      <footer className="fixed bottom-0 left-0 w-full z-50 text-center text-sm text-zinc-600 dark:text-zinc-400 backdrop-blur-sm bg-white/80 dark:bg-zinc-900/80 py-4">
         Made with ❤️ by Joginder Tanikella. © 2025{" "}
         <a
           href="https://x.com/jogitanikella"
-          className="text-blue-600 dark:text-blue-400 ml-2"
           target="_blank"
+          className="ml-3 inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 hover:scale-105 transition-transform"
         >
-          x
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+            <path d="M20.9 3.6L13.6 12l7.3 8.4h-3.3L12 13.8 6 20.4H3.1l7.6-8.7L3.1 3.6H6l6.2 6.9 5.7-6.9h3z" />
+          </svg>
         </a>
         <a
           href="https://www.linkedin.com/in/jogindertanikella/"
-          className="text-blue-600 dark:text-blue-400 ml-2"
           target="_blank"
+          className="ml-3 inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 hover:scale-105 transition-transform"
         >
-          in
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+            <path d="M20.45 20.45h-3.55v-5.6c0-1.33-.02-3.04-1.86-3.04-1.86 0-2.15 1.45-2.15 2.94v5.7h-3.55V9h3.4v1.56h.05c.47-.89 1.6-1.83 3.29-1.83 3.52 0 4.17 2.32 4.17 5.34v6.38zM5.34 7.43c-1.14 0-2.07-.93-2.07-2.08 0-1.15.93-2.07 2.07-2.07s2.07.92 2.07 2.07c0 1.15-.93 2.08-2.07 2.08zm1.78 13.02H3.56V9h3.56v11.45z" />
+          </svg>
         </a>
       </footer>
     </div>
