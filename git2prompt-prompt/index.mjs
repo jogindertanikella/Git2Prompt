@@ -17,7 +17,6 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // Debug endpoint: list all prompts
     if (request.method === "GET" && url.pathname === "/api/all-prompts") {
       const list = await env.PROMPT_CACHE.list();
       const data = {};
@@ -52,7 +51,6 @@ export default {
     const [_, owner, repo] = repoUrl.split("/").slice(-3);
     const cacheKey = `${owner}/${repo}`;
 
-    // Check KV cache first
     let cachedPrompt = await env.PROMPT_CACHE.get(cacheKey);
     if (cachedPrompt) {
       return new Response(JSON.stringify({ prompt: cachedPrompt, cached: true }), {
@@ -63,7 +61,6 @@ export default {
       });
     }
 
-    // Fetch README from GitHub
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/readme`;
     let readmeText = "";
     try {
@@ -79,21 +76,16 @@ export default {
       readmeText = "Error fetching README.";
     }
 
-    const promptToLLM = `You are a senior software engineer working with the Cursor code editor.
+    const promptToLLM = `Given the following README from a GitHub repository:
 
-Analyze the GitHub repo at ${repoUrl}.
-
-Here is the README:
----
 ${readmeText}
----
 
-Please generate a Cursor-compatible prompt that:
-1. Summarizes the purpose and tech stack.
-2. Proposes a modular folder structure.
-3. Suggests any improvements or missing components.
-4. If the project is incomplete, scaffold an MVP structure with placeholder components.
-5. Write this as a prompt someone can paste into Cursor to get to work immediately.`;
+Generate a developer-oriented prompt that:
+- Summarizes the purpose and tech stack.
+- Proposes a modular folder structure.
+- Suggests improvements or missing components.
+- If incomplete, scaffolds an MVP structure with placeholders.
+- Format the response as a prompt ready to paste into any AI coding assistant.`;
 
     let generatedPrompt = "⚠️ No response from model.";
     try {
@@ -120,6 +112,18 @@ Please generate a Cursor-compatible prompt that:
       } else {
         generatedPrompt = JSON.stringify(result, null, 2);
       }
+
+      // === 🧼 Clean up fluff from model response ===
+      generatedPrompt = generatedPrompt
+        // Remove common preambles
+        .replace(/^.*(Here('?s)? the prompt:?|Sure!?|Okay,?|Prompt:)\s*/i, "")
+        // Remove trailing disclaimers or suggestions
+        .replace(/\n*Feel free to.*$/i, "")
+        .replace(/\n*You can customize.*$/i, "")
+        .replace(/\n*Let me know.*$/i, "")
+        // Remove repeated newlines
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
 
       await env.PROMPT_CACHE.put(cacheKey, generatedPrompt);
     } catch (err) {

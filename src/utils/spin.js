@@ -16,11 +16,10 @@ export const spin = async ({ categoryIndex, stars, setRepos, setRateLimit, setLo
     return { tags: [] };
   }
 
-  const selected = Array.from({ length: 5 }, () =>
-    stack[Math.floor(Math.random() * stack.length)]
-  );
+  const shuffled = [...stack].sort(() => 0.5 - Math.random());
+  const selected = shuffled.slice(0, 3); // ensure uniqueness
 
-  await fetchRepos({ query: selected, stars, setRepos, setRateLimit, setLoading });
+  const repos = await fetchRepos({ query: selected, stars, setRepos, setRateLimit, setLoading });
 
-  return { tags: selected }; // ✅ return tags to caller
+  return { tags: selected, repos }; // ✅ now includes actual results
 };

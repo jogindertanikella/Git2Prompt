@@ -8,8 +8,8 @@ import { handlePrompt } from "./utils/handlePrompt";
 import { spin } from "./utils/spin";
 import { timeAgo } from "./utils/timeAgo";
 import { uiuxoptions } from "./constants/uiuxoptions";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+// import { ToastContainer, toast } from "react-toastify";
+// import "react-toastify/dist/ReactToastify.css";
 import { useRotatingQuery } from "./utils/useRotatingQuery";
 import { useTypingEffect } from "./utils/useTypingEffect";
 import { isValidGithubUrl } from "./utils/isValidGithubUrl";
@@ -29,6 +29,8 @@ export default function App() {
   const [showModal, setShowModal] = useState(false);
   const [disabledRepoId, setDisabledRepoId] = useState(null);
   const [hoveredRepoId, setHoveredRepoId] = useState(null);
+  const [infoMessage, setInfoMessage] = useState("");
+
 
   const inputRef = useRef(null);
 
@@ -50,72 +52,81 @@ export default function App() {
     fetchSpinCount(setSpinCount);
   }, []);
 
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === "/" && document.activeElement !== inputRef.current) {
-        e.preventDefault();
-        inputRef.current?.focus();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        triggerSearch(searchQuery);
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [searchQuery]);
-
-  const triggerSearch = async (input) => {
-    const clean = input?.trim();
-    if (!clean || clean.length < 3) return;
-
-    setSearchQuery(clean);
-    setSearchLoading(true);
-
-    try {
-      // 🧠 If it's a GitHub URL, handle prompt directly
-      if (isValidGithubUrl(clean)) {
-        await handlePrompt({
-          id: Date.now(),
-          url: clean,
-          setDisabledRepoId,
-          setModalPrompt,
-          setShowModal,
-        });
-        return;
-      }
-
-      // 🔁 Convert human-readable input to topics
-      const transformedQuery = clean
-        .toLowerCase()
-        .split(/[\s,|]+/)
-        .map((word) => readableToTopicMap[word] || word)
-        .join(" ");
-
-      const fetched = await fetchRepos({
-        query: transformedQuery,
-        stars,
-        setRepos,
-        setRateLimit,
-        setLoading: setSearchLoading,
-      });
-
-      if (!fetched || fetched.length === 0) {
-        toast.info("❌ No results found.");
-        setSearchQuery("");
-      }
-
-      await fetch(`${API_URLS.QUERY}/api/store-query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: clean }),
-      });
-    } catch (err) {
-      console.error("Search error:", err);
-      toast.error("⚠️ Something went wrong. Please try again.");
-      setSearchQuery("");
-    } finally {
-      setSearchLoading(false);
+useEffect(() => {
+  const handleKey = (e) => {
+    if (e.key === "/" && document.activeElement !== inputRef.current) {
+      e.preventDefault();
+      inputRef.current?.focus();
+    } else if (e.key === "Enter" && document.activeElement === inputRef.current) {
+      e.preventDefault();
+      triggerSearch(searchQuery);
     }
   };
+
+  window.addEventListener("keydown", handleKey);
+  return () => window.removeEventListener("keydown", handleKey);
+}, [searchQuery]);
+
+
+const triggerSearch = async (input) => {
+  const clean = input?.trim();
+  if (!clean || clean.length < 3) return;
+
+  setSearchQuery(clean);
+  setSearchLoading(true);
+
+  try {
+    // 🧠 GitHub URL → Generate prompt
+    if (isValidGithubUrl(clean)) {
+      await handlePrompt({
+        id: Date.now(),
+        url: clean,
+        setDisabledRepoId,
+        setModalPrompt,
+        setShowModal,
+      });
+
+      // ✅ Skip rest of search flow
+      return;
+    }
+
+    // 🔁 checkqueryhistory (cache → NLP → GitHub search → store)
+const res = await fetch(`${API_URLS.QUERY}/api/checkqueryhistory`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ query: clean }),
+});
+
+
+    const data = await res.json();
+// console.log(data);
+    if (!data.items || data.items.length === 0) {
+    //  toast.info("❌ No results found.");
+       setInfoMessage("❌ No results found.");
+  setRepos([]); // ✅ clear grid
+  setSearchQuery("");
+    // Auto-clear after 3 seconds
+  setTimeout(() => setInfoMessage(""), 3000);
+    } else {
+      setRepos(data.items);
+      setRateLimit(data.rate || {});
+    }
+  } catch (err) {
+  //  console.error("Search error:", err);
+//    toast.error("⚠️ Something went wrong. Please try again.");
+       setInfoMessage("⚠️ Something went wrong. Please try again.");
+  setRepos([]); // ✅ clear grid
+  setSearchQuery("");
+    // Auto-clear after 3 seconds
+  setTimeout(() => setInfoMessage(""), 3000);
+  } finally {
+    setSearchLoading(false);
+  }
+};
+
+
+
+
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-black dark:bg-zinc-900 dark:text-white px-4 py-6">
@@ -190,45 +201,71 @@ export default function App() {
 
 
 
-        <p className="text-center text-sm mt-2 text-zinc-500 dark:text-zinc-400">
-          💡 Try:{" "}
-          <span
-            onClick={() => triggerSearch(rotatingQuery)}
-            className="italic text-blue-500 cursor-pointer hover:underline"
-          >
-            "{typedQuery}"
-          </span>
-        </p>
+<div className="text-center text-sm mt-2 text-zinc-500 dark:text-zinc-400">
+  <p>
 
+    <span
+      onClick={() => triggerSearch(rotatingQuery)}
+      className="italic text-blue-500 cursor-pointer hover:underline"
+    >
+      "{typedQuery}"
+    </span>
+  </p>
+<p className="mt-1">💡 Based on what others are exploring - Try it out ↑ </p>
+
+
+</div>
         <div className="mt-4 flex justify-center gap-4">
           <button
             disabled={searchLoading || loading}
-            onClick={async () => {
-              const selectedCategory = categories[categoryIndex];
-              const stack = selectedCategory.stack;
-              const selectedTags = Array.from(
-                new Set(Array.from({ length: 3 }, () => stack[Math.floor(Math.random() * stack.length)]))
-              );
+onClick={async () => {
+  const selectedCategory = categories[categoryIndex];
+  const stack = selectedCategory.stack;
 
-              const tagsText = selectedTags
-                .map((t) => t.replace(/^topic:/, ""))
-                .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
-                .join(", ")
-                .replace(/, ([^,]*)$/, " and $1");
+  const selectedTags = Array.from(
+    new Set(Array.from({ length: 3 }, () => stack[Math.floor(Math.random() * stack.length)]))
+  );
 
-              const starLabel = stars === 0 ? "any star count" : `${stars}+ stars`;
-              const readable = `${tagsText} projects with ${starLabel}`;
-              setSearchQuery(readable);
+  const tagsText = selectedTags
+    .map((t) => t.replace(/^topic:/, ""))
+    .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
+    .join(", ")
+    .replace(/, ([^,]*)$/, " and $1");
 
-              await spin({
-                categoryIndex,
-                categories,
-                stars,
-                setRepos,
-                setRateLimit,
-                setLoading,
-              });
-            }}
+  const starLabel = stars === 0 ? "any star count" : `${stars}+ stars`;
+  const readable = `${tagsText} projects with ${starLabel}`;
+  setSearchQuery(readable);
+
+  try {
+    const result = await spin({
+      categoryIndex,
+      categories,
+      stars,
+      setRepos,
+      setRateLimit,
+      setLoading,
+    });
+
+    if (!result.repos || result.repos.length === 0) {
+     // toast.info("❌ No results found.");
+ setInfoMessage("❌ No results found.");
+  setSearchQuery("");
+  setRepos([]); // ✅ clear grid
+  // Auto-clear after 3 seconds
+  setTimeout(() => setInfoMessage(""), 3000);
+    }
+  } catch (err) {
+    //console.error("Spin search error:", err);
+   // toast.error("⚠️ Something went wrong during spin.");
+ setInfoMessage("⚠️ Something went wrong during spin.");
+  setSearchQuery("");
+  setRepos([]); // ✅ clear grid
+  // Auto-clear after 3 seconds
+  setTimeout(() => setInfoMessage(""), 3000);
+  }
+}}
+
+
             className={`${
               searchLoading || loading ? "opacity-50 cursor-not-allowed" : ""
             } btn-shimmer bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full text-sm font-medium`}
@@ -281,83 +318,94 @@ export default function App() {
         </div>
       )}
 
-      <div
-        className={`relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto transition-all duration-200 ${
-          loading || searchLoading ? "opacity-40 pointer-events-none blur-sm" : ""
-        }`}
-      >
-        {repos.map((repo) => (
-          <div
-            key={repo.id}
-            className="bg-zinc-100 dark:bg-zinc-800 p-5 rounded-xl shadow-md relative"
-            onMouseEnter={() => setHoveredRepoId(repo.id)}
-            onMouseLeave={() => setHoveredRepoId(null)}
-          >
-            <h2 className="text-blue-600 dark:text-blue-400 font-semibold text-lg truncate">
-              {repo.full_name}
-            </h2>
-            <p className="text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2 min-h-[3em]">
-              {repo.description || "No description"}
-            </p>
-            <div className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
-              ⭐ {repo.stargazers_count.toLocaleString()}
-              {repo.fromAPI && repo.updated_at && uiuxoptions.showFreshness && (
-                <span className="ml-2 text-xs text-zinc-500">
-                  • {timeAgo(repo.updated_at)}
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex gap-2 z-20 relative">
-              <a
-                href={repo.html_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-emerald-600 px-3 py-1 rounded text-sm hover:bg-emerald-700 text-white"
-              >
-                GitHub ↗
-              </a>
-              <button
-                disabled={!!disabledRepoId}
-                onClick={() =>
-                  handlePrompt({
-                    id: repo.id,
-                    url: repo.html_url,
-                    setDisabledRepoId,
-                    setModalPrompt,
-                    setShowModal,
-                  })
-                }
-                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
-                  disabledRepoId === repo.id
-                    ? "bg-yellow-400 text-black"
-                    : "bg-yellow-500 text-black hover:bg-yellow-400"
-                }`}
-              >
-                {disabledRepoId === repo.id ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <img src="/images/git2prompt.png" alt="Git2Prompt" className="w-4 h-4 mr-1 rounded-lg" />
-                    Git2Prompt
-                  </>
-                )}
-              </button>
-            </div>
-
-            {hoveredRepoId === repo.id && repo.description && (
-              <div className="absolute inset-0 bg-zinc-900/90 text-white p-4 rounded-xl z-10 overflow-y-auto overflow-x-hidden backdrop-blur-md">
-                <p className="text-sm whitespace-pre-line">{repo.description}</p>
-              </div>
+<div className="relative min-h-[200px] max-w-6xl mx-auto transition-all duration-200">
+{infoMessage ? (
+  <div className="flex justify-center items-center">
+    <div className="animate-fade-in bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 text-sm px-4 py-2 rounded-md shadow-md transition-all duration-300">
+      {infoMessage}
+    </div>
+  </div>
+) : (
+    <div
+      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 ${
+        loading || searchLoading ? "opacity-40 pointer-events-none blur-sm" : ""
+      }`}
+    >
+      {repos.map((repo) => (
+        <div
+          key={repo.id}
+          className="bg-zinc-100 dark:bg-zinc-800 p-5 rounded-xl shadow-md relative"
+          onMouseEnter={() => setHoveredRepoId(repo.id)}
+          onMouseLeave={() => setHoveredRepoId(null)}
+        >
+          <h2 className="text-blue-600 dark:text-blue-400 font-semibold text-lg truncate">
+            {repo.full_name}
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2 min-h-[3em]">
+            {repo.description || "No description"}
+          </p>
+          <div className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
+            ⭐ {repo.stargazers_count.toLocaleString()}
+            {repo.fromAPI && repo.updated_at && uiuxoptions.showFreshness && (
+              <span className="ml-2 text-xs text-zinc-500">
+                • {timeAgo(repo.updated_at)}
+              </span>
             )}
           </div>
-        ))}
-      </div>
+          <div className="mt-3 flex gap-2 z-20 relative">
+            <a
+              href={repo.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-emerald-600 px-3 py-1 rounded text-sm hover:bg-emerald-700 text-white"
+            >
+              GitHub ↗
+            </a>
+            <button
+              disabled={!!disabledRepoId}
+              onClick={() =>
+                handlePrompt({
+                  id: repo.id,
+                  url: repo.html_url,
+                  setDisabledRepoId,
+                  setModalPrompt,
+                  setShowModal,
+                })
+              }
+              className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                disabledRepoId === repo.id
+                  ? "bg-yellow-400 text-black"
+                  : "bg-yellow-500 text-black hover:bg-yellow-400"
+              }`}
+            >
+              {disabledRepoId === repo.id ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <img src="/images/git2prompt.png" alt="Git2Prompt" className="w-4 h-4 mr-1 rounded-lg" />
+                  Git2Prompt
+                </>
+              )}
+            </button>
+          </div>
+
+          {hoveredRepoId === repo.id && repo.description && (
+            <div className="absolute inset-0 bg-zinc-900/90 text-white p-4 rounded-xl z-10 overflow-y-auto overflow-x-hidden backdrop-blur-md">
+              <p className="text-sm whitespace-pre-line">{repo.description}</p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
 
       {rateLimit && uiuxoptions.showRateLimit && (
         <p className="text-center text-xs text-zinc-400 mt-4">
@@ -402,7 +450,7 @@ export default function App() {
         </div>
       )}
 
-      <ToastContainer position="top-center" autoClose={1500} hideProgressBar theme={theme} />
+      {/* <ToastContainer position="top-center" autoClose={1500} hideProgressBar theme={theme} /> */}
 
       <footer className="fixed bottom-0 left-0 w-full z-50 text-center text-sm text-zinc-600 dark:text-zinc-400 backdrop-blur-sm bg-white/80 dark:bg-zinc-900/80 py-4">
         Made with ❤️ by Joginder Tanikella. © 2025{" "}

@@ -1,75 +1,100 @@
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+import { convertToGitHubSearchQuery } from "../src/utils/naturalsearch.js";
 
-    // CORS headers
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Content-Type": "application/json"
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // Handle OPTIONS preflight
+    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    if (url.pathname !== "/") {
-      return new Response(JSON.stringify({ error: "Not found" }), {
-        status: 404,
-        headers: corsHeaders
-      });
+    // Accept only POST
+    if (request.method !== "POST") {
+      return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
     }
 
-    const q = url.searchParams.get("q") || "";
-    const stars = url.searchParams.get("stars") || "";
-    const perPage = url.searchParams.get("per_page") || "6";
-
-    const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}${stars ? `+stars:>=${stars}` : ""}&sort=stars&order=desc&per_page=${perPage}`;
-
-    // 🎯 Spin counter update
-    let newSpinCount = 0;
-    try {
-      const current = await env.visitor_count_kv.get("spins");
-      const count = parseInt(current || "0", 10);
-      newSpinCount = count + 1;
-      await env.visitor_count_kv.put("spins", newSpinCount.toString());
-    } catch (kvErr) {
-      console.error("KV access failed:", kvErr);
-    }
-
-    try {
-      const githubRes = await fetch(apiUrl, {
-        headers: {
-          Authorization: `Bearer ${env.GITHUB_SEARCH_TOKEN}`,
-          "User-Agent": "Git2Prompt-Search"
+    // /searchfromspintext — uses preformatted GitHub search query
+    if (url.pathname === "/searchfromspintext") {
+      try {
+        const { query } = await request.json();
+        if (!query || query.trim().length < 3) {
+          return new Response(JSON.stringify({ error: "Invalid or too short query" }), {
+            status: 400,
+            headers: corsHeaders,
+          });
         }
-      });
 
-      const data = await githubRes.json();
+        const githubApiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+          query.trim()
+        )}&sort=stars&order=desc&per_page=6`;
 
-      return new Response(JSON.stringify({
-        items: data.items || [],
-        rate: {
-          limit: githubRes.headers.get("X-RateLimit-Limit"),
-          remaining: githubRes.headers.get("X-RateLimit-Remaining"),
-          reset: githubRes.headers.get("X-RateLimit-Reset")
-        },
-        spins: newSpinCount
-      }), {
-        headers: corsHeaders
-      });
+        const response = await fetch(githubApiUrl, {
+          headers: {
+            Authorization: `Bearer ${env.GITHUB_SEARCH_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "User-Agent": "Git2Prompt/1.0",
+          },
+        });
 
-    } catch (err) {
-      console.error("GitHub fetch failed:", err);
-      return new Response(JSON.stringify({
-        error: "GitHub fetch failed",
-        details: err.message
-      }), {
-        status: 500,
-        headers: corsHeaders
-      });
+        const data = await response.json();
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "Server error", detail: err.message }), {
+          status: 500,
+          headers: corsHeaders,
+        });
+      }
     }
-  }
+
+    // /search — standard NLP → GitHub query
+    if (url.pathname === "/search") {
+      try {
+        const { query } = await request.json();
+        if (!query || query.trim().length < 3) {
+          return new Response(JSON.stringify({ error: "Invalid or too short query" }), {
+            status: 400,
+            headers: corsHeaders,
+          });
+        }
+
+        const githubQuery = convertToGitHubSearchQuery(query);
+
+        const githubApiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+          githubQuery
+        )}&sort=stars&order=desc&per_page=6`;
+
+        const response = await fetch(githubApiUrl, {
+          headers: {
+            Authorization: `Bearer ${env.GITHUB_SEARCH_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "User-Agent": "Git2Prompt/1.0",
+          },
+        });
+
+        const data = await response.json();
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "Server error", detail: err.message }), {
+          status: 500,
+          headers: corsHeaders,
+        });
+      }
+    }
+
+    // Fallback
+    return new Response("Not Found", { status: 404, headers: corsHeaders });
+  },
 };
+
