@@ -346,7 +346,7 @@ onClick={async () => {
           </p>
           <div className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
             ⭐ {repo.stargazers_count.toLocaleString()}
-            {repo.fromAPI && repo.updated_at && uiuxoptions.showFreshness && (
+            {repo.updated_at && uiuxoptions.showFreshness && (
               <span className="ml-2 text-xs text-zinc-500">
                 • {timeAgo(repo.updated_at)}
               </span>

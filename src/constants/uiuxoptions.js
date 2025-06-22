@@ -3,7 +3,7 @@
 export const uiuxoptions = {
   showCategories: false,
   showRateLimit: false,
-  showFreshness: false,
+  showFreshness: true,
   showLoadingText: false,
   enableTypingEffect: true, // 💡 toggle for typing animation in rotating query
 };
