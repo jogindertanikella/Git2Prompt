@@ -4,7 +4,7 @@ import { baseCategories } from "../constants/baseCategories";
 import { fetchRepos } from "./fetchRepos";
 import { uiuxoptions } from "../constants/uiuxoptions";
 
-export const spin = ({ categoryIndex, stars, setRepos, setRateLimit, setLoading }) => {
+export const spin = async ({ categoryIndex, stars, setRepos, setRateLimit, setLoading }) => {
   const categories = uiuxoptions.showCategories
     ? [{ name: "Random", stack: baseCategories.flatMap(c => c.stack) }, ...baseCategories]
     : [{ name: "Random", stack: baseCategories.flatMap(c => c.stack) }];
@@ -13,12 +13,14 @@ export const spin = ({ categoryIndex, stars, setRepos, setRateLimit, setLoading 
 
   if (!stack || stack.length === 0) {
     console.error("Invalid category index or empty stack.");
-    return;
+    return { tags: [] };
   }
 
   const selected = Array.from({ length: 5 }, () =>
     stack[Math.floor(Math.random() * stack.length)]
   );
 
-  fetchRepos({ query: selected, stars, setRepos, setRateLimit, setLoading });
+  await fetchRepos({ query: selected, stars, setRepos, setRateLimit, setLoading });
+
+  return { tags: selected }; // ✅ return tags to caller
 };

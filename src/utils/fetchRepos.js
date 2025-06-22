@@ -7,11 +7,15 @@ export async function fetchRepos({ query, stars, setRepos, setRateLimit, setLoad
   try {
     const res = await fetch(`${API_URLS.SEARCH}?${params}`);
     const data = await res.json();
-    setRepos(data.items || []);
+
+    const items = data.items || [];
+    setRepos(items);
     setRateLimit(data.rate || null);
+    return items; // ✅ return items to caller
   } catch {
     setRepos([]);
+    return []; // ✅ return empty array on failure
+  } finally {
+    setLoading(false);
   }
-
-  setLoading(false);
 }

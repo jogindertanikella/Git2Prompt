@@ -13,6 +13,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useRotatingQuery } from "./utils/useRotatingQuery";
 import { useTypingEffect } from "./utils/useTypingEffect";
 import { isValidGithubUrl } from "./utils/isValidGithubUrl";
+import { readableToTopicMap } from "./constants/readableToTopicMap";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
@@ -62,33 +63,46 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [searchQuery]);
 
-  const triggerSearch = async (query) => {
-    const clean = query?.trim();
+  const triggerSearch = async (input) => {
+    const clean = input?.trim();
     if (!clean || clean.length < 3) return;
-
-    if (isValidGithubUrl(clean)) {
-      try {
-        setSearchLoading(true);
-        await handlePrompt({
-          id: `manual-${Date.now()}`,
-          url: clean,
-          setDisabledRepoId,
-          setModalPrompt,
-          setShowModal,
-        });
-      } catch (err) {
-        toast.error("⚠️ Failed to generate prompt.");
-      } finally {
-        setSearchLoading(false);
-      }
-      return;
-    }
 
     setSearchQuery(clean);
     setSearchLoading(true);
 
     try {
-      await fetchRepos({ query: clean, stars, setRepos, setRateLimit, setLoading: setSearchLoading });
+      // 🧠 If it's a GitHub URL, handle prompt directly
+      if (isValidGithubUrl(clean)) {
+        await handlePrompt({
+          id: Date.now(),
+          url: clean,
+          setDisabledRepoId,
+          setModalPrompt,
+          setShowModal,
+        });
+        return;
+      }
+
+      // 🔁 Convert human-readable input to topics
+      const transformedQuery = clean
+        .toLowerCase()
+        .split(/[\s,|]+/)
+        .map((word) => readableToTopicMap[word] || word)
+        .join(" ");
+
+      const fetched = await fetchRepos({
+        query: transformedQuery,
+        stars,
+        setRepos,
+        setRateLimit,
+        setLoading: setSearchLoading,
+      });
+
+      if (!fetched || fetched.length === 0) {
+        toast.info("❌ No results found.");
+        setSearchQuery("");
+      }
+
       await fetch(`${API_URLS.QUERY}/api/store-query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,11 +110,12 @@ export default function App() {
       });
     } catch (err) {
       console.error("Search error:", err);
+      toast.error("⚠️ Something went wrong. Please try again.");
+      setSearchQuery("");
     } finally {
       setSearchLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-black dark:bg-zinc-900 dark:text-white px-4 py-6">
@@ -120,33 +135,60 @@ export default function App() {
       </header>
 
       <div className="w-full flex flex-col items-center mb-6 px-4">
-        <div className="relative w-full max-w-3xl">
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="🔍 Ask anything... or paste a GitHub repo URL"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-6 py-3 pr-20 rounded-full bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border border-zinc-300 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-12 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-red-500 text-xl"
-            >
-              ❌
-            </button>
-          )}
-          <button
-            disabled={searchLoading || loading || !searchQuery.trim()}
-            onClick={() => triggerSearch(searchQuery)}
-            className={`absolute right-4 top-1/2 transform -translate-y-1/2 text-xl ${
-              searchLoading ? "animate-pulse" : ""
-            }`}
-          >
-            {searchLoading ? "⏳" : "🚀"}
-          </button>
-        </div>
+<div className="relative w-full max-w-3xl">
+  <input
+    ref={inputRef}
+    type="text"
+    placeholder="🔍 Ask anything... or paste a GitHub repo URL"
+    value={searchQuery}
+    onChange={(e) => setSearchQuery(e.target.value)}
+    disabled={searchLoading || loading}
+    className={`w-full px-6 py-3 pr-20 rounded-full border bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-opacity duration-300 ${
+      searchLoading || loading ? "opacity-50 blur-[1px] cursor-not-allowed" : ""
+    }`}
+  />
+
+  {searchQuery && (
+    <button
+      onClick={() => setSearchQuery("")}
+      disabled={searchLoading || loading}
+      className={`absolute right-12 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-red-500 text-xl transition-opacity duration-300 ${
+        searchLoading || loading ? "opacity-50 blur-[1px] cursor-not-allowed" : ""
+      }`}
+    >
+      ❌
+    </button>
+  )}
+
+  <button
+    disabled={searchLoading || loading || !searchQuery.trim()}
+    onClick={() => triggerSearch(searchQuery)}
+    className={`absolute right-4 top-1/2 transform -translate-y-1/2 text-xl transition-opacity duration-300 ${
+      searchLoading || loading ? "opacity-50 blur-[1px] cursor-not-allowed" : ""
+    }`}
+  >
+    {searchLoading || loading ? (
+      <svg
+        className="animate-spin h-5 w-5 text-yellow-500"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 2h8m-8 20h8M8 2v2a6 6 0 006 6v0a6 6 0 01-6 6v2m8-16v2a6 6 0 01-6 6v0a6 6 0 006 6v2"
+        />
+      </svg>
+    ) : (
+      "🚀"
+    )}
+  </button>
+</div>
+
+
+
 
         <p className="text-center text-sm mt-2 text-zinc-500 dark:text-zinc-400">
           💡 Try:{" "}
@@ -158,46 +200,79 @@ export default function App() {
           </span>
         </p>
 
+        <div className="mt-4 flex justify-center gap-4">
+          <button
+            disabled={searchLoading || loading}
+            onClick={async () => {
+              const selectedCategory = categories[categoryIndex];
+              const stack = selectedCategory.stack;
+              const selectedTags = Array.from(
+                new Set(Array.from({ length: 3 }, () => stack[Math.floor(Math.random() * stack.length)]))
+              );
 
-<div className="mt-4 flex justify-center gap-4">
-  <button
-    disabled={searchLoading || loading}
-    onClick={() => {
-      const selectedCategory = categories[categoryIndex];
-      const randomTerm = selectedCategory.stack[Math.floor(Math.random() * selectedCategory.stack.length)];
-      const starLabel = stars === 0 ? "any" : `${stars}+`;
+              const tagsText = selectedTags
+                .map((t) => t.replace(/^topic:/, ""))
+                .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
+                .join(", ")
+                .replace(/, ([^,]*)$/, " and $1");
 
-      setSearchQuery(`${randomTerm} | stars: ${starLabel}`);
-      spin({ categoryIndex, categories, stars, setRepos, setRateLimit, setLoading });
-    }}
-    className={`${
-      searchLoading || loading ? "opacity-50 cursor-not-allowed" : ""
-    } btn-shimmer bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full text-sm font-medium`}
-  >
-    {loading ? "⏳ Rolling..." : "🎲 Surprise me!"}
-  </button>
+              const starLabel = stars === 0 ? "any star count" : `${stars}+ stars`;
+              const readable = `${tagsText} projects with ${starLabel}`;
+              setSearchQuery(readable);
+
+              await spin({
+                categoryIndex,
+                categories,
+                stars,
+                setRepos,
+                setRateLimit,
+                setLoading,
+              });
+            }}
+            className={`${
+              searchLoading || loading ? "opacity-50 cursor-not-allowed" : ""
+            } btn-shimmer bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full text-sm font-medium`}
+          >
+{loading ? (
+  <span className="flex items-center gap-2">
+    <svg
+      className="animate-spin h-5 w-5 text-white"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M6 2a1 1 0 000 2v2a6 6 0 003 5.2A6 6 0 006 16v2a1 1 0 000 2h12a1 1 0 000-2v-2a6 6 0 00-3-4.8A6 6 0 0018 6V4a1 1 0 000-2H6zm2 2h8v2a4 4 0 01-2.3 3.6 1 1 0 00-.2.2 1 1 0 01-1.5 0 1 1 0 00-.2-.2A4 4 0 018 6V4zm8 14H8v-2a4 4 0 012.3-3.6 1 1 0 00.2-.2 1 1 0 011.5 0 1 1 0 00.2.2A4 4 0 0116 16v2z" />
+    </svg>
+    Rolling...
+  </span>
+) : (
+  "🎲 Surprise me!"
+)}
+
+          </button>
+        </div>
+
+<div className="flex gap-2 mt-4">
+  {starOptions.map((s) => (
+    <button
+      key={s}
+      onClick={() => {
+        setStars(s); // ✅ Always update stars
+        if (searchQuery.trim()) {
+          triggerSearch(searchQuery); // ✅ Only trigger search if query exists
+        }
+      }}
+      className={`px-3 py-1 rounded-full border text-sm transition ${
+        stars === s
+          ? "bg-yellow-500 text-black font-semibold"
+          : "bg-zinc-200 dark:bg-zinc-700 text-black dark:text-white"
+      }`}
+    >
+      {s === 0 ? "⭐ Any" : `⭐ ${s}+`}
+    </button>
+  ))}
 </div>
 
-
-        <div className="flex gap-2 mt-4">
-          {starOptions.map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                if (!searchQuery.trim()) return;
-                setStars(s);
-                triggerSearch(searchQuery);
-              }}
-              className={`px-3 py-1 rounded-full border text-sm ${
-                stars === s
-                  ? "bg-yellow-500 text-black font-semibold"
-                  : "bg-zinc-200 dark:bg-zinc-700 text-black dark:text-white"
-              }`}
-            >
-              {s === 0 ? "⭐ Any" : `⭐ ${s}+`}
-            </button>
-          ))}
-        </div>
       </div>
 
       {spinCount !== null && (
@@ -260,34 +335,15 @@ export default function App() {
               >
                 {disabledRepoId === repo.id ? (
                   <>
-                    <svg
-                      className="animate-spin h-4 w-4 mr-1"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v8H4z"
-                      />
+                    <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
                     Loading...
                   </>
                 ) : (
                   <>
-                    <img
-                      src="/images/git2prompt.png"
-                      alt="Git2Prompt"
-                      className="w-4 h-4 mr-1 rounded-lg"
-                    />
+                    <img src="/images/git2prompt.png" alt="Git2Prompt" className="w-4 h-4 mr-1 rounded-lg" />
                     Git2Prompt
                   </>
                 )}
@@ -314,13 +370,11 @@ export default function App() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50">
           <div className="bg-white dark:bg-zinc-900 text-black dark:text-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 relative transition-all duration-300 ease-out scale-95 opacity-0 animate-fadeIn">
             <h3 className="text-2xl font-bold mb-4">📋 Generated Prompt</h3>
-
             <textarea
               readOnly
               className="w-full h-64 p-4 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none resize-none"
               value={modalPrompt}
             />
-
             <div className="flex justify-between items-center mt-6">
               <button
                 onClick={() => {
@@ -338,7 +392,6 @@ export default function App() {
                 Close
               </button>
             </div>
-
             <button
               onClick={() => setShowModal(false)}
               className="absolute top-3 right-3 w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xl text-zinc-600 dark:text-white hover:scale-105 transition"
@@ -353,23 +406,11 @@ export default function App() {
 
       <footer className="fixed bottom-0 left-0 w-full z-50 text-center text-sm text-zinc-600 dark:text-zinc-400 backdrop-blur-sm bg-white/80 dark:bg-zinc-900/80 py-4">
         Made with ❤️ by Joginder Tanikella. © 2025{" "}
-        <a
-          href="https://x.com/jogitanikella"
-          target="_blank"
-          className="ml-3 inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 hover:scale-105 transition-transform"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
-            <path d="M20.9 3.6L13.6 12l7.3 8.4h-3.3L12 13.8 6 20.4H3.1l7.6-8.7L3.1 3.6H6l6.2 6.9 5.7-6.9h3z" />
-          </svg>
+        <a href="https://x.com/jogitanikella" target="_blank" className="ml-3 inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 hover:scale-105 transition-transform">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5"><path d="M20.9 3.6L13.6 12l7.3 8.4h-3.3L12 13.8 6 20.4H3.1l7.6-8.7L3.1 3.6H6l6.2 6.9 5.7-6.9h3z" /></svg>
         </a>
-        <a
-          href="https://www.linkedin.com/in/jogindertanikella/"
-          target="_blank"
-          className="ml-3 inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 hover:scale-105 transition-transform"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
-            <path d="M20.45 20.45h-3.55v-5.6c0-1.33-.02-3.04-1.86-3.04-1.86 0-2.15 1.45-2.15 2.94v5.7h-3.55V9h3.4v1.56h.05c.47-.89 1.6-1.83 3.29-1.83 3.52 0 4.17 2.32 4.17 5.34v6.38zM5.34 7.43c-1.14 0-2.07-.93-2.07-2.08 0-1.15.93-2.07 2.07-2.07s2.07.92 2.07 2.07c0 1.15-.93 2.08-2.07 2.08zm1.78 13.02H3.56V9h3.56v11.45z" />
-          </svg>
+        <a href="https://www.linkedin.com/in/jogindertanikella/" target="_blank" className="ml-3 inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 hover:scale-105 transition-transform">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5"><path d="M20.45 20.45h-3.55v-5.6c0-1.33-.02-3.04-1.86-3.04-1.86 0-2.15 1.45-2.15 2.94v5.7h-3.55V9h3.4v1.56h.05c.47-.89 1.6-1.83 3.29-1.83 3.52 0 4.17 2.32 4.17 5.34v6.38zM5.34 7.43c-1.14 0-2.07-.93-2.07-2.08 0-1.15.93-2.07 2.07-2.07s2.07.92 2.07 2.07c0 1.15-.93 2.08-2.07 2.08zm1.78 13.02H3.56V9h3.56v11.45z" /></svg>
         </a>
       </footer>
     </div>
