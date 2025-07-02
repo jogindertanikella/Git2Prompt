@@ -15,5 +15,6 @@ export default {
       },
     },
   },
-  plugins: [],
+// @ts-ignore
+plugins: [require("daisyui")],
 };
