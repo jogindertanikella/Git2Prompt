@@ -2,7 +2,7 @@ export function timeAgo(dateStr) {
   try {
     const date = new Date(dateStr);
     if (isNaN(date)) return "";
-
+//a remark
     const diff = Date.now() - date.getTime();
     const mins = Math.floor(diff / 60000);
 
