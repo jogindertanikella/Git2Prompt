@@ -1,0 +1,7 @@
+name = "visitorstats"
+main = "index.js"
+compatibility_date = "2024-07-05"
+
+[[kv_namespaces]]
+binding = "VISITOR_STATS"
+id = "c1416272dbaf4d7d980ee9be5525db98"

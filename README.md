@@ -14,7 +14,7 @@ Whether you're exploring ideas, generating MVPs, or searching for inspiration, G
 
 ## 🚀 Live Demo
 
-👉 [git2prompt.com](https://git2prompt.com) (coming soon)
+👉 [git2prompt.com](https://git2prompt.com/)
 
 ## 🛠️ Tech Stack
 
