@@ -183,7 +183,7 @@ export default {
         await env.query_history_kv.put(queryKey, JSON.stringify(record));
 
         return new Response(
-          JSON.stringify({ from: "fresh", items }),
+          JSON.stringify({ from: "fresh", items, query }),
           {
             headers: {
               "Content-Type": "application/json",
@@ -252,7 +252,7 @@ export default {
         await env.query_history_kv.put(queryKey, JSON.stringify(record));
 
         return new Response(
-          JSON.stringify({ from: "fresh", items }),
+          JSON.stringify({ from: "fresh", items, query }),
           {
             headers: {
               "Content-Type": "application/json",
