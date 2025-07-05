@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_URLS } from "../constants/apicalls"; // Make sure you import this if not already
 
 export default function DeleteAllQueries() {
   const [loading, setLoading] = useState(false);
@@ -16,11 +17,7 @@ export default function DeleteAllQueries() {
     setError(null);
 
     try {
-  const res = await fetch(`${API_URLS.QUERY}/api/delete-all-queries`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: clean }),
-  });
+      const res = await fetch(`${API_URLS.QUERY}/api/delete-all-queries`);
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }
