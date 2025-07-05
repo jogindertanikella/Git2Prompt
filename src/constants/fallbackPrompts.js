@@ -1,8 +1,13 @@
 export const fallbackPrompts = {
-  "vercel/next.js": `Prompt: Summarize the features of Next.js and generate a boilerplate folder structure for a scalable web app using Next.js, Tailwind, and API routes.`,
-  "facebook/react": `Prompt: Explore React's capabilities and create a modular folder structure for a component-driven application. Include best practices and reusable hooks.`,
-  "tensorflow/tensorflow": `Prompt: Analyze the TensorFlow repo and scaffold a training pipeline with a modular structure using FastAPI for inference.`,
-  "sindresorhus/awesome": `Prompt: Convert this markdown list into a categorized UI layout. Suggest ways to make this interactive and searchable.`,
-  "laravel/laravel": `Prompt: Extract the Laravel backend structure and build a REST API template with authentication, middleware, and modular services.`,
-  "kubernetes/kubernetes": `Prompt: Summarize the Kubernetes repo and provide a setup for simulating clusters locally using Minikube. Add a basic dashboard scaffold.`
+  "vercel/next.js": `Summarize the purpose and tech stack of Next.js. Propose a modular folder structure for a scalable web application using Next.js, Tailwind CSS, and API routes. Suggest improvements or missing components. If the README is incomplete, scaffold an MVP structure with placeholders. Format the response as a prompt ready to paste into any AI coding assistant.`,
+
+  "facebook/react": `Summarize the purpose and tech stack of React. Propose a modular folder structure for a component-driven application including reusable hooks and best practices. Suggest improvements or missing components. If the README is incomplete, scaffold an MVP structure with placeholders. Format the response as a prompt ready to paste into any AI coding assistant.`,
+
+  "tensorflow/tensorflow": `Summarize the purpose and tech stack of TensorFlow. Propose a modular folder structure for building a machine learning training pipeline and using FastAPI for inference. Suggest improvements or missing components. If the README is incomplete, scaffold an MVP structure with placeholders. Format the response as a prompt ready to paste into any AI coding assistant.`,
+
+  "sindresorhus/awesome": `Summarize the purpose and tech stack of the Awesome list repository. Propose a modular folder structure for converting the markdown list into a categorized interactive UI. Suggest improvements or missing components such as search and filters. If the README is incomplete, scaffold an MVP structure with placeholders. Format the response as a prompt ready to paste into any AI coding assistant.`,
+
+  "laravel/laravel": `Summarize the purpose and tech stack of Laravel. Propose a modular folder structure for a REST API backend including authentication, middleware, and services. Suggest improvements or missing components. If the README is incomplete, scaffold an MVP structure with placeholders. Format the response as a prompt ready to paste into any AI coding assistant.`,
+
+  "kubernetes/kubernetes": `Summarize the purpose and tech stack of Kubernetes. Propose a modular folder structure for simulating clusters locally with Minikube and including a basic dashboard scaffold. Suggest improvements or missing components. If the README is incomplete, scaffold an MVP structure with placeholders. Format the response as a prompt ready to paste into any AI coding assistant.`
 };
