@@ -161,26 +161,29 @@ export default {
         const data = await githubRes.json();
         const items = data.items || [];
 
-        const now = new Date().toISOString();
-        const geo = request.cf || {};
-        const originIp = request.headers.get("cf-connecting-ip") || "unknown";
+        // Store only if there are results
+        if (items.length > 0) {
+          const now = new Date().toISOString();
+          const geo = request.cf || {};
+          const originIp = request.headers.get("cf-connecting-ip") || "unknown";
 
-        const record = {
-          query,
-          count: 1,
-          timestamp: now,
-          lastSeen: now,
-          origin: originIp,
-          items,
-          geo: {
-            country: geo.country || "unknown",
-            region: geo.region || "unknown",
-            city: geo.city || "unknown",
-            colo: geo.colo || "unknown",
-          },
-        };
+          const record = {
+            query,
+            count: 1,
+            timestamp: now,
+            lastSeen: now,
+            origin: originIp,
+            items,
+            geo: {
+              country: geo.country || "unknown",
+              region: geo.region || "unknown",
+              city: geo.city || "unknown",
+              colo: geo.colo || "unknown",
+            },
+          };
 
-        await env.query_history_kv.put(queryKey, JSON.stringify(record));
+          await env.query_history_kv.put(queryKey, JSON.stringify(record));
+        }
 
         return new Response(
           JSON.stringify({ from: "fresh", items, query }),
@@ -230,26 +233,29 @@ export default {
         const data = await githubRes.json();
         const items = data.items || [];
 
-        const now = new Date().toISOString();
-        const geo = request.cf || {};
-        const originIp = request.headers.get("cf-connecting-ip") || "unknown";
+        // Store only if there are results
+        if (items.length > 0) {
+          const now = new Date().toISOString();
+          const geo = request.cf || {};
+          const originIp = request.headers.get("cf-connecting-ip") || "unknown";
 
-        const record = {
-          query,
-          count: 1,
-          timestamp: now,
-          lastSeen: now,
-          origin: originIp,
-          items,
-          geo: {
-            country: geo.country || "unknown",
-            region: geo.region || "unknown",
-            city: geo.city || "unknown",
-            colo: geo.colo || "unknown",
-          },
-        };
+          const record = {
+            query,
+            count: 1,
+            timestamp: now,
+            lastSeen: now,
+            origin: originIp,
+            items,
+            geo: {
+              country: geo.country || "unknown",
+              region: geo.region || "unknown",
+              city: geo.city || "unknown",
+              colo: geo.colo || "unknown",
+            },
+          };
 
-        await env.query_history_kv.put(queryKey, JSON.stringify(record));
+          await env.query_history_kv.put(queryKey, JSON.stringify(record));
+        }
 
         return new Response(
           JSON.stringify({ from: "fresh", items, query }),
