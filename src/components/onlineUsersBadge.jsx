@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-export default function VisitorMap({ mode = "full" }) {
+export default function OnlineUsersBadge({ mode = "full" }) {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -25,23 +25,21 @@ export default function VisitorMap({ mode = "full" }) {
     // Refresh every 30 seconds
     intervalId = setInterval(fetchStats, 30000);
 
-    // Cleanup interval on unmount
     return () => clearInterval(intervalId);
   }, []);
 
   if (mode === "minimal") {
     return (
       <span className="inline-flex items-center text-sm text-zinc-600 dark:text-zinc-400">
-        {loading ? "Loading visitors..." : `👥 ${count} people using Git2Prompt now.`}
+        {loading ? "Loading users..." : `👥 ${count} people using Git2Prompt now.`}
       </span>
     );
   }
 
-  // Full mode - here just a larger text and maybe more styling
   return (
     <div className="w-full text-center">
       {loading ? (
-        <div className="text-xs opacity-70">Loading visitors...</div>
+        <div className="text-xs opacity-70">Loading users...</div>
       ) : (
         <p className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">
           👥 {count} people using Git2Prompt right now.

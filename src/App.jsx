@@ -9,7 +9,7 @@ import { uiuxoptions } from "./constants/uiuxoptions";
 import { useRotatingQuery } from "./utils/useRotatingQuery";
 import { useTypingEffect } from "./utils/useTypingEffect";
 import { isValidGithubUrl } from "./utils/isValidGithubUrl";
-import VisitorMap from "./components/visitorMap";
+import VisitorMap from "./components/onlineUsersBadge";
 import RepoCard from "./components/repoCard";
 import PromptModal from "./components/promptModal";
 import StickyFooter from "./components/stickyFooter";

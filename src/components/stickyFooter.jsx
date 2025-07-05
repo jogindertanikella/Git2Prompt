@@ -1,4 +1,4 @@
-import VisitorMap from "./visitorMap";
+import VisitorMap from "./onlineUsersBadge";
 
 export default function StickyFooter() {
   return (
