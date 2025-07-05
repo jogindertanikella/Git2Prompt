@@ -1,31 +1,17 @@
 import { convertToGitHubSearchQuery } from "../src/utils/naturalsearch.js";
-import { getCorsHeaders } from "./corsHeaders.js";
-
+import { getCorsHeaders } from "../src/constants/corsHeaders.js";
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const origin = request.headers.get("Origin");
-
-    // Validate origin
-    let allowedOrigin = "";
-    if (ALLOWED_ORIGINS.includes(origin)) {
-      allowedOrigin = origin;
-    }
-
-    const baseCorsHeaders = {
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
+    const origin = request.headers.get("Origin") || "";
+    const corsHeaders = getCorsHeaders(origin);
 
     // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
@@ -33,10 +19,7 @@ export default {
     if (request.method !== "POST") {
       return new Response("Method Not Allowed", {
         status: 405,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
@@ -45,13 +28,16 @@ export default {
       try {
         const { query } = await request.json();
         if (!query || query.trim().length < 3) {
-          return new Response(JSON.stringify({ error: "Invalid or too short query" }), {
-            status: 400,
-            headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-            },
-          });
+          return new Response(
+            JSON.stringify({ error: "Invalid or too short query" }),
+            {
+              status: 400,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+              },
+            }
+          );
         }
 
         const githubApiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
@@ -70,19 +56,21 @@ export default {
         return new Response(JSON.stringify(data), {
           status: 200,
           headers: {
-            ...baseCorsHeaders,
+            ...corsHeaders,
             "Content-Type": "application/json",
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
           },
         });
       } catch (err) {
-        return new Response(JSON.stringify({ error: "Server error", detail: err.message }), {
-          status: 500,
-          headers: {
-            ...baseCorsHeaders,
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-          },
-        });
+        return new Response(
+          JSON.stringify({ error: "Server error", detail: err.message }),
+          {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
       }
     }
 
@@ -91,13 +79,16 @@ export default {
       try {
         const { query } = await request.json();
         if (!query || query.trim().length < 3) {
-          return new Response(JSON.stringify({ error: "Invalid or too short query" }), {
-            status: 400,
-            headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-            },
-          });
+          return new Response(
+            JSON.stringify({ error: "Invalid or too short query" }),
+            {
+              status: 400,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+              },
+            }
+          );
         }
 
         const githubQuery = convertToGitHubSearchQuery(query);
@@ -118,29 +109,28 @@ export default {
         return new Response(JSON.stringify(data), {
           status: 200,
           headers: {
-            ...baseCorsHeaders,
+            ...corsHeaders,
             "Content-Type": "application/json",
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
           },
         });
       } catch (err) {
-        return new Response(JSON.stringify({ error: "Server error", detail: err.message }), {
-          status: 500,
-          headers: {
-            ...baseCorsHeaders,
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-          },
-        });
+        return new Response(
+          JSON.stringify({ error: "Server error", detail: err.message }),
+          {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
       }
     }
 
     // Fallback
     return new Response("Not Found", {
       status: 404,
-      headers: {
-        ...baseCorsHeaders,
-        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-      },
+      headers: corsHeaders,
     });
   },
 };

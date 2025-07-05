@@ -8,24 +8,23 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
 
-    // Validate origin against allowed list
-    let allowedOrigin = "";
-    if (ALLOWED_ORIGINS.includes(origin)) {
-      allowedOrigin = origin;
-    }
-
+    // Base CORS headers
     const baseCorsHeaders = {
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
+    // Add Allow-Origin if the origin is allowed
+    const corsHeaders = { ...baseCorsHeaders };
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      corsHeaders["Access-Control-Allow-Origin"] = origin;
+    }
+
+    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
@@ -37,10 +36,7 @@ export default {
         if (!cleanQuery || cleanQuery.length < 3) {
           return new Response("Invalid or too short query", {
             status: 400,
-            headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-            },
+            headers: corsHeaders,
           });
         }
 
@@ -75,17 +71,14 @@ export default {
 
         return new Response(JSON.stringify({ success: true }), {
           headers: {
-            ...baseCorsHeaders,
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+            ...corsHeaders,
+            "Content-Type": "application/json",
           },
         });
       } catch {
         return new Response("Error storing query", {
           status: 500,
-          headers: {
-            ...baseCorsHeaders,
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-          },
+          headers: corsHeaders,
         });
       }
     }
@@ -107,9 +100,8 @@ export default {
 
       return new Response(JSON.stringify(uniqueRecent), {
         headers: {
-          ...baseCorsHeaders,
+          ...corsHeaders,
           "Content-Type": "application/json",
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
         },
       });
     }
@@ -122,8 +114,8 @@ export default {
           return new Response(JSON.stringify({ error: "Invalid query" }), {
             status: 400,
             headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+              ...corsHeaders,
+              "Content-Type": "application/json",
             },
           });
         }
@@ -141,9 +133,8 @@ export default {
             }),
             {
               headers: {
-                ...baseCorsHeaders,
+                ...corsHeaders,
                 "Content-Type": "application/json",
-                ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
               },
             }
           );
@@ -185,9 +176,8 @@ export default {
           JSON.stringify({ from: "fresh", items }),
           {
             headers: {
-              ...baseCorsHeaders,
+              ...corsHeaders,
               "Content-Type": "application/json",
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
             },
           }
         );
@@ -198,8 +188,8 @@ export default {
           {
             status: 500,
             headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+              ...corsHeaders,
+              "Content-Type": "application/json",
             },
           }
         );
@@ -214,8 +204,8 @@ export default {
           return new Response(JSON.stringify({ error: "Invalid query" }), {
             status: 400,
             headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+              ...corsHeaders,
+              "Content-Type": "application/json",
             },
           });
         }
@@ -228,9 +218,8 @@ export default {
             JSON.stringify({ from: "cache", query: existing.query }),
             {
               headers: {
-                ...baseCorsHeaders,
+                ...corsHeaders,
                 "Content-Type": "application/json",
-                ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
               },
             }
           );
@@ -270,9 +259,8 @@ export default {
           JSON.stringify({ from: "fresh", items }),
           {
             headers: {
-              ...baseCorsHeaders,
+              ...corsHeaders,
               "Content-Type": "application/json",
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
             },
           }
         );
@@ -283,8 +271,8 @@ export default {
           {
             status: 500,
             headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+              ...corsHeaders,
+              "Content-Type": "application/json",
             },
           }
         );
@@ -296,7 +284,7 @@ export default {
       try {
         const list = await env.query_history_kv.list({ prefix: "query-" });
         const records = await Promise.all(
-          list.keys.map(entry =>
+          list.keys.map((entry) =>
             env.query_history_kv.get(entry.name, { type: "json" })
           )
         );
@@ -307,9 +295,8 @@ export default {
 
         return new Response(JSON.stringify(filtered, null, 2), {
           headers: {
-            ...baseCorsHeaders,
+            ...corsHeaders,
             "Content-Type": "application/json",
-            ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
           },
         });
       } catch (err) {
@@ -319,8 +306,8 @@ export default {
           {
             status: 500,
             headers: {
-              ...baseCorsHeaders,
-              ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+              ...corsHeaders,
+              "Content-Type": "application/json",
             },
           }
         );
@@ -331,9 +318,8 @@ export default {
     return new Response(JSON.stringify({ error: "Not Found" }), {
       status: 404,
       headers: {
-        ...baseCorsHeaders,
+        ...corsHeaders,
         "Content-Type": "application/json",
-        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
       },
     });
   },

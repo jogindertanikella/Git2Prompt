@@ -5,27 +5,27 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
 
-    // Validate origin against allowed list
-    let allowedOrigin = "";
-    if (ALLOWED_ORIGINS.includes(origin)) {
-      allowedOrigin = origin;
-    }
-
+    // Base CORS headers
     const baseCorsHeaders = {
-      "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
+    // Add Allow-Origin if the origin is allowed
+    const corsHeaders = { ...baseCorsHeaders };
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      corsHeaders["Access-Control-Allow-Origin"] = origin;
+    }
+
+    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
+    // Handle GET /api/all-prompts
     if (request.method === "GET" && url.pathname === "/api/all-prompts") {
       const list = await env.PROMPT_CACHE.list();
       const data = {};
@@ -36,60 +36,55 @@ export default {
       return new Response(JSON.stringify(data, null, 2), {
         headers: {
           "Content-Type": "application/json",
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+          ...corsHeaders,
         },
       });
     }
 
+    // Require POST for other routes
     if (request.method !== "POST") {
       return new Response("Use POST method", {
         status: 405,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
+    // Parse JSON body
     let body;
     try {
       body = await request.json();
     } catch {
       return new Response("Invalid JSON body", {
         status: 400,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
+    // Validate GitHub URL
     const repoUrl = body.url;
     if (!repoUrl || !repoUrl.startsWith("https://github.com/")) {
       return new Response("Missing or invalid GitHub URL", {
         status: 400,
-        headers: {
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
-        },
+        headers: corsHeaders,
       });
     }
 
+    // Parse owner/repo
     const [_, owner, repo] = repoUrl.split("/").slice(-3);
     const cacheKey = `${owner}/${repo}`;
 
+    // Check cache
     let cachedPrompt = await env.PROMPT_CACHE.get(cacheKey);
     if (cachedPrompt) {
       return new Response(JSON.stringify({ prompt: cachedPrompt, cached: true }), {
         headers: {
           "Content-Type": "application/json",
-          ...baseCorsHeaders,
-          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+          ...corsHeaders,
         },
       });
     }
 
+    // Fetch README
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/readme`;
     let readmeText = "";
     try {
@@ -105,6 +100,7 @@ export default {
       readmeText = "Error fetching README.";
     }
 
+    // Build prompt for LLM
     const promptToLLM = `Given the following README from a GitHub repository:
 
 ${readmeText}
@@ -142,7 +138,7 @@ Generate a developer-oriented prompt that:
         generatedPrompt = JSON.stringify(result, null, 2);
       }
 
-      // Clean up fluff from model response
+      // Clean up fluff
       generatedPrompt = generatedPrompt
         .replace(/^.*(Here('?s)? the prompt:?|Sure!?|Okay,?|Prompt:)\s*/i, "")
         .replace(/\n*Feel free to.*$/i, "")
@@ -160,8 +156,7 @@ Generate a developer-oriented prompt that:
     return new Response(JSON.stringify({ prompt: generatedPrompt, cached: false }), {
       headers: {
         "Content-Type": "application/json",
-        ...baseCorsHeaders,
-        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+        ...corsHeaders,
       },
     });
   },

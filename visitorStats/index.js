@@ -4,30 +4,48 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
-    const origin = request.headers.get("Origin");
+    const origin = request.headers.get("Origin") || "";
 
-    let allowedOrigin = "";
+    // Base CORS headers
+    const baseCorsHeaders = {
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    // Compose full CORS headers
+    const corsHeaders = { ...baseCorsHeaders };
     if (ALLOWED_ORIGINS.includes(origin)) {
-      allowedOrigin = origin;
+      corsHeaders["Access-Control-Allow-Origin"] = origin;
+    }
+
+    // Handle OPTIONS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders,
+      });
     }
 
     if (pathname === "/api/getOnlineVisitors") {
-      return await getOnlineVisitors(env, allowedOrigin);
+      return await getOnlineVisitors(env, corsHeaders);
     }
 
     if (pathname === "/api/getAllVisitorStats") {
-      return await getAllVisitorStats(env, allowedOrigin);
+      return await getAllVisitorStats(env, corsHeaders);
     }
 
     if (pathname === "/api/ping") {
-      return await trackVisitor(request, env, allowedOrigin);
+      return await trackVisitor(request, env, corsHeaders);
     }
 
-    return new Response("Not found", { status: 404 });
+    return new Response("Not found", {
+      status: 404,
+      headers: corsHeaders,
+    });
   }
 };
 
-async function trackVisitor(request, env, allowedOrigin) {
+async function trackVisitor(request, env, corsHeaders) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const country = request.cf?.country || "??";
   const now = Date.now();
@@ -44,11 +62,11 @@ async function trackVisitor(request, env, allowedOrigin) {
   let countryCount = parseInt(countryCountRaw || "0", 10) + 1;
   await env.VISITOR_STATS.put(countryKey, countryCount.toString());
 
-  // Mark this IP as online (timestamp)
+  // Mark this IP as online
   const onlineKey = `online:${ip}`;
   await env.VISITOR_STATS.put(onlineKey, now.toString(), { expirationTtl: 300 }); // expires in 5 min
 
-  // Log visit (for future analytics)
+  // Log visit
   const logKey = `log:${now}:${ip}`;
   const logData = {
     ip,
@@ -58,42 +76,42 @@ async function trackVisitor(request, env, allowedOrigin) {
   };
   await env.VISITOR_STATS.put(logKey, JSON.stringify(logData));
 
-  // Count currently online visitors
+  // Count currently online
   const onlineList = await env.VISITOR_STATS.list({ prefix: "online:" });
   const onlineCount = onlineList.keys.length;
 
   return new Response(
     JSON.stringify({
       total: totalCount,
-      currentlyOnline: Math.max(1, onlineCount) // never show less than 1
+      currentlyOnline: Math.max(1, onlineCount)
     }),
     {
       headers: {
         "Content-Type": "application/json",
-        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {})
+        ...corsHeaders
       }
     }
   );
 }
 
-async function getOnlineVisitors(env, allowedOrigin) {
+async function getOnlineVisitors(env, corsHeaders) {
   const onlineList = await env.VISITOR_STATS.list({ prefix: "online:" });
   const onlineCount = onlineList.keys.length;
 
   return new Response(
     JSON.stringify({
-      currentlyOnline: Math.max(1, onlineCount) // never show less than 1
+      currentlyOnline: Math.max(1, onlineCount)
     }),
     {
       headers: {
         "Content-Type": "application/json",
-        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {})
+        ...corsHeaders
       }
     }
   );
 }
 
-async function getAllVisitorStats(env, allowedOrigin) {
+async function getAllVisitorStats(env, corsHeaders) {
   // Get total count
   const total = await env.VISITOR_STATS.get("total");
   const totalCount = parseInt(total || "0", 10);
@@ -107,7 +125,7 @@ async function getAllVisitorStats(env, allowedOrigin) {
     countries[code] = parseInt(value || "0", 10);
   }
 
-  // Get all logs (be careful: potentially big)
+  // Get all logs (limit to 1000)
   const logsList = await env.VISITOR_STATS.list({ prefix: "log:", limit: 1000 });
   const logs = [];
   for (const item of logsList.keys) {
@@ -124,7 +142,7 @@ async function getAllVisitorStats(env, allowedOrigin) {
     {
       headers: {
         "Content-Type": "application/json",
-        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {})
+        ...corsHeaders
       }
     }
   );
