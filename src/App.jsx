@@ -65,61 +65,60 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [searchQuery]);
 
-  const triggerSearch = async (input) => {
-    const clean = input?.trim();
-    if (!clean || clean.length < 3) return;
+const triggerSearch = async (input) => {
+  const clean = input?.trim();
+  if (!clean || clean.length < 3) return;
 
-    setSearchQuery(clean);
-    setSearchLoading(true);
+  setSearchQuery(clean);
+  setSearchLoading(true);
 
-    try {
-      if (isValidGithubUrl(clean)) {
-        await handlePrompt({
-          id: Date.now(),
-          url: clean,
-          setDisabledRepoId,
-          setModalPrompt,
-          setShowModal,
-        });
-        return;
-      }
-
-      const res = await fetch(`${API_URLS.QUERY}/api/checkqueryhistory`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: clean }),
+  try {
+    if (isValidGithubUrl(clean)) {
+      await handlePrompt({
+        id: Date.now(),
+        url: clean,
+        setDisabledRepoId,
+        setModalPrompt,
+        setShowModal,
       });
-      const data = await res.json();
-
-      if (!data.items || data.items.length === 0) {
-        setInfoMessage("❌ No results found.");
-        setRepos([]);
-        setSearchQuery("");
-        setTimeout(() => setInfoMessage(""), 3000);
-      } else {
-        let items = data.items;
-
-        if (items.length < 9) {
-          const existingIds = new Set(items.map((r) => r.id));
-          const needed = 9 - items.length;
-          const fallbacks = fallbackRepos
-            .filter((r) => !existingIds.has(r.id))
-            .slice(0, needed);
-          items = [...items, ...fallbacks];
-        }
-
-        setRepos(items.slice(0, 9));
-        setRateLimit(data.rate || {});
-      }
-    } catch {
-      setInfoMessage("⚠️ Something went wrong. Please try again.");
-      setRepos([]);
-      setSearchQuery("");
-      setTimeout(() => setInfoMessage(""), 3000);
-    } finally {
-      setSearchLoading(false);
+      return;
     }
-  };
+
+    const res = await fetch(`${API_URLS.QUERY}/api/checkqueryhistory`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: clean }),
+    });
+    const data = await res.json();
+
+    if (!data.items || data.items.length === 0) {
+      setInfoMessage("❌ No results found.");
+      setRepos([]);
+      setTimeout(() => setInfoMessage(""), 3000);
+    } else {
+      let items = data.items;
+
+      if (items.length < 9) {
+        const existingIds = new Set(items.map((r) => r.id));
+        const needed = 9 - items.length;
+        const fallbacks = fallbackRepos
+          .filter((r) => !existingIds.has(r.id))
+          .slice(0, needed);
+        items = [...items, ...fallbacks];
+      }
+
+      setRepos(items.slice(0, 9));
+      setRateLimit(data.rate || {});
+    }
+  } catch {
+    setInfoMessage("⚠️ Something went wrong. Please try again.");
+    setRepos([]);
+    setTimeout(() => setInfoMessage(""), 3000);
+  } finally {
+    setSearchLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-black dark:bg-zinc-900 dark:text-white px-4 py-6">
