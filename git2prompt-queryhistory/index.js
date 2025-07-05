@@ -305,8 +305,9 @@ export default {
       }
 
 
-// DELETE all queries (safe batching)
-if (request.method === "DELETE" && url.pathname === "/api/delete-all-queries") {
+// GET to delete all queries (safe batching)
+if (request.method === "GET" && url.pathname === "/api/delete-all-queries") {
+
   let deletedCount = 0;
   let cursor = undefined;
 

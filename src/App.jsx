@@ -16,8 +16,10 @@ import StickyFooter from "./components/stickyFooter";
 import SearchBox from "./components/searchBox";
 import HeaderBar from "./components/headerBar";
 import ControlPanel from "./components/controlPanel";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import DeleteAllQueries from "./pages/DeleteAllQueries";
 
-export default function App() {
+function MainApp() {
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [stars, setStars] = useState(0);
@@ -42,18 +44,15 @@ export default function App() {
   const rotatingQuery = useRotatingQuery();
   const typedQuery = useTypingEffect(rotatingQuery, uiuxoptions.enableTypingEffect);
 
-  // Theme persistence
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // Spin count
   useEffect(() => {
     fetchSpinCount(setSpinCount);
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === "/" && document.activeElement !== inputRef.current) {
@@ -68,12 +67,11 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [searchQuery]);
 
-  // Online visitor ping
   useEffect(() => {
     const ping = () =>
       fetch("https://visitorstats.joginder-tanikella.workers.dev/api/ping").catch(() => {});
     ping();
-    const intervalId = setInterval(ping, 2 * 60 * 1000); // every 2 minutes
+    const intervalId = setInterval(ping, 2 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, []);
 
@@ -103,8 +101,7 @@ export default function App() {
       });
       const data = await res.json();
 
-
-          console.log("Search result:", data); // <-- Here is the log
+      console.log("Search result:", data);
 
       if (!data.items || data.items.length === 0) {
         setInfoMessage("❌ No results found.");
@@ -125,8 +122,8 @@ export default function App() {
         setRepos(items.slice(0, 9));
         setRateLimit(data.rate || {});
       }
-          } catch (error) {
-                console.error("Search error:", error); // <-- Also logs any error details
+    } catch (error) {
+      console.error("Search error:", error);
       setInfoMessage("⚠️ Something went wrong. Please try again.");
       setRepos([]);
       setTimeout(() => setInfoMessage(""), 3000);
@@ -166,7 +163,6 @@ export default function App() {
         setInfoMessage={setInfoMessage}
       />
 
-      {/* Spacer between control panel and grid */}
       <div className="h-4" />
 
       <div className="relative min-h-[200px] max-w-6xl mx-auto transition-all duration-200">
@@ -208,5 +204,16 @@ export default function App() {
         <OnlineUsersBadge mode="minimal" />
       </StickyFooter>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/delete-all-queries" element={<DeleteAllQueries />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
