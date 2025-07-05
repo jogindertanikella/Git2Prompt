@@ -9,7 +9,7 @@ export default {
     const origin = request.headers.get("Origin") || "";
 
     const baseCorsHeaders = {
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
@@ -161,7 +161,6 @@ export default {
         const data = await githubRes.json();
         const items = data.items || [];
 
-        // Store only if there are results
         if (items.length > 0) {
           const now = new Date().toISOString();
           const geo = request.cf || {};
@@ -233,7 +232,6 @@ export default {
         const data = await githubRes.json();
         const items = data.items || [];
 
-        // Store only if there are results
         if (items.length > 0) {
           const now = new Date().toISOString();
           const geo = request.cf || {};
@@ -305,6 +303,48 @@ export default {
           );
         }
       }
+
+
+// DELETE all queries (safe batching)
+if (request.method === "DELETE" && url.pathname === "/api/delete-all-queries") {
+  let deletedCount = 0;
+  let cursor = undefined;
+
+  do {
+    const list = await env.query_history_kv.list({
+      prefix: "query-",
+      limit: 1000,
+      cursor,
+    });
+
+    if (list.keys.length > 0) {
+      // Batch delete in smaller chunks
+      const batches = [];
+      const chunkSize = 50;
+      for (let i = 0; i < list.keys.length; i += chunkSize) {
+        const chunk = list.keys.slice(i, i + chunkSize);
+        batches.push(Promise.all(chunk.map((entry) => env.query_history_kv.delete(entry.name))));
+      }
+      // Wait for all batches to complete
+      await Promise.all(batches);
+
+      deletedCount += list.keys.length;
+    }
+
+    cursor = list.cursor;
+  } while (cursor);
+
+  return new Response(
+    JSON.stringify({ success: true, deletedCount }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    }
+  );
+}
+
 
       // 404 Fallback
       return new Response(JSON.stringify({ error: "Not Found" }), {
