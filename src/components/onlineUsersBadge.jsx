@@ -24,10 +24,14 @@ export default function OnlineUsersBadge({ mode = "full" }) {
     return () => clearInterval(intervalId);
   }, []);
 
+  const displayText = loading
+    ? "Loading users..."
+    : `👥 ${count} ${count === 1 ? "person" : "people"} using Git2Prompt now.`;
+
   if (mode === "minimal") {
     return (
       <span className="inline-flex items-center text-sm text-zinc-600 dark:text-zinc-400">
-        {loading ? "Loading users..." : `👥 ${count} people using Git2Prompt now.`}
+        {displayText}
       </span>
     );
   }
@@ -38,7 +42,7 @@ export default function OnlineUsersBadge({ mode = "full" }) {
         <div className="text-xs opacity-70">Loading users...</div>
       ) : (
         <p className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">
-          👥 {count} people using Git2Prompt right now.
+          {displayText.replace("now.", "right now.")}
         </p>
       )}
     </div>

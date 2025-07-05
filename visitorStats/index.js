@@ -11,7 +11,11 @@ export default {
       return await getAllVisitorStats(env);
     }
 
-    return await trackVisitor(request, env);
+    if (pathname === "/api/ping") {
+      return await trackVisitor(request, env);
+    }
+
+    return new Response("Not found", { status: 404 });
   }
 };
 
