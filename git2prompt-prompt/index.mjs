@@ -3,7 +3,7 @@ import { ALLOWED_ORIGINS } from "../src/constants/allowedOrigins.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const origin = request.headers.get("Origin");
+    const origin = request.headers.get("Origin") || "";
 
     // Base CORS headers
     const baseCorsHeaders = {
@@ -11,13 +11,13 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // Add Allow-Origin if the origin is allowed
+    // Add Allow-Origin if allowed
     const corsHeaders = { ...baseCorsHeaders };
     if (ALLOWED_ORIGINS.includes(origin)) {
       corsHeaders["Access-Control-Allow-Origin"] = origin;
     }
 
-    // Handle CORS preflight
+    // Preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -25,23 +25,34 @@ export default {
       });
     }
 
-    // Handle GET /api/all-prompts
+    // GET /api/all-prompts
     if (request.method === "GET" && url.pathname === "/api/all-prompts") {
-      const list = await env.PROMPT_CACHE.list();
-      const data = {};
-      for (const entry of list.keys) {
-        const value = await env.PROMPT_CACHE.get(entry.name);
-        data[entry.name] = value;
+      try {
+        const list = await env.PROMPT_CACHE.list();
+        const data = {};
+        for (const entry of list.keys) {
+          const value = await env.PROMPT_CACHE.get(entry.name);
+          data[entry.name] = value;
+        }
+        return new Response(JSON.stringify(data, null, 2), {
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        });
+      } catch (err) {
+        console.error("Error listing prompts:", err);
+        return new Response(JSON.stringify({ error: "Server error" }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        });
       }
-      return new Response(JSON.stringify(data, null, 2), {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      });
     }
 
-    // Require POST for other routes
+    // Require POST
     if (request.method !== "POST") {
       return new Response("Use POST method", {
         status: 405,
@@ -54,22 +65,27 @@ export default {
     try {
       body = await request.json();
     } catch {
-      return new Response("Invalid JSON body", {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
-        headers: corsHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
       });
     }
 
     // Validate GitHub URL
     const repoUrl = body.url;
     if (!repoUrl || !repoUrl.startsWith("https://github.com/")) {
-      return new Response("Missing or invalid GitHub URL", {
+      return new Response(JSON.stringify({ error: "Missing or invalid GitHub URL" }), {
         status: 400,
-        headers: corsHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
       });
     }
 
-    // Parse owner/repo
     const [_, owner, repo] = repoUrl.split("/").slice(-3);
     const cacheKey = `${owner}/${repo}`;
 
@@ -100,7 +116,7 @@ export default {
       readmeText = "Error fetching README.";
     }
 
-    // Build prompt for LLM
+    // Build prompt
     const promptToLLM = `Given the following README from a GitHub repository:
 
 ${readmeText}

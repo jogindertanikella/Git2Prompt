@@ -15,17 +15,23 @@ export default {
       });
     }
 
-    // Accept only POST
-    if (request.method !== "POST") {
-      return new Response("Method Not Allowed", {
-        status: 405,
-        headers: corsHeaders,
-      });
-    }
+    try {
+      // Accept only POST
+      if (request.method !== "POST") {
+        return new Response(
+          JSON.stringify({ error: "Method Not Allowed" }),
+          {
+            status: 405,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
 
-    // /searchfromspintext — uses preformatted GitHub search query
-    if (url.pathname === "/searchfromspintext") {
-      try {
+      // /searchfromspintext — uses preformatted GitHub search query
+      if (url.pathname === "/searchfromspintext") {
         const { query } = await request.json();
         if (!query || query.trim().length < 3) {
           return new Response(
@@ -60,23 +66,10 @@ export default {
             "Content-Type": "application/json",
           },
         });
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ error: "Server error", detail: err.message }),
-          {
-            status: 500,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
       }
-    }
 
-    // /search — standard NLP → GitHub query
-    if (url.pathname === "/search") {
-      try {
+      // /search — standard NLP → GitHub query
+      if (url.pathname === "/search") {
         const { query } = await request.json();
         if (!query || query.trim().length < 3) {
           return new Response(
@@ -113,24 +106,31 @@ export default {
             "Content-Type": "application/json",
           },
         });
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ error: "Server error", detail: err.message }),
-          {
-            status: 500,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
       }
-    }
 
-    // Fallback
-    return new Response("Not Found", {
-      status: 404,
-      headers: corsHeaders,
-    });
+      // Fallback for other POST routes
+      return new Response(
+        JSON.stringify({ error: "Not Found" }),
+        {
+          status: 404,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    } catch (err) {
+      console.error("Unexpected server error:", err);
+      return new Response(
+        JSON.stringify({ error: "Server error", detail: err.message }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
   },
 };
