@@ -7,14 +7,26 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
+
+    // Validate origin against allowed list
+    let allowedOrigin = "";
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      allowedOrigin = origin;
+    }
+
+    const baseCorsHeaders = {
       "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders });
+      return new Response(null, {
+        status: 204,
+        headers: {
+          ...baseCorsHeaders,
+          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+        },
+      });
     }
 
     if (request.method === "GET" && url.pathname === "/api/all-prompts") {
@@ -27,25 +39,44 @@ export default {
       return new Response(JSON.stringify(data, null, 2), {
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...baseCorsHeaders,
+          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
         },
       });
     }
 
     if (request.method !== "POST") {
-      return new Response("Use POST method", { status: 405, headers: corsHeaders });
+      return new Response("Use POST method", {
+        status: 405,
+        headers: {
+          ...baseCorsHeaders,
+          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+        },
+      });
     }
 
     let body;
     try {
       body = await request.json();
     } catch {
-      return new Response("Invalid JSON body", { status: 400, headers: corsHeaders });
+      return new Response("Invalid JSON body", {
+        status: 400,
+        headers: {
+          ...baseCorsHeaders,
+          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+        },
+      });
     }
 
     const repoUrl = body.url;
     if (!repoUrl || !repoUrl.startsWith("https://github.com/")) {
-      return new Response("Missing or invalid GitHub URL", { status: 400, headers: corsHeaders });
+      return new Response("Missing or invalid GitHub URL", {
+        status: 400,
+        headers: {
+          ...baseCorsHeaders,
+          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
+        },
+      });
     }
 
     const [_, owner, repo] = repoUrl.split("/").slice(-3);
@@ -56,7 +87,8 @@ export default {
       return new Response(JSON.stringify({ prompt: cachedPrompt, cached: true }), {
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...baseCorsHeaders,
+          ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
         },
       });
     }
@@ -113,15 +145,12 @@ Generate a developer-oriented prompt that:
         generatedPrompt = JSON.stringify(result, null, 2);
       }
 
-      // === 🧼 Clean up fluff from model response ===
+      // Clean up fluff from model response
       generatedPrompt = generatedPrompt
-        // Remove common preambles
         .replace(/^.*(Here('?s)? the prompt:?|Sure!?|Okay,?|Prompt:)\s*/i, "")
-        // Remove trailing disclaimers or suggestions
         .replace(/\n*Feel free to.*$/i, "")
         .replace(/\n*You can customize.*$/i, "")
         .replace(/\n*Let me know.*$/i, "")
-        // Remove repeated newlines
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 
@@ -134,7 +163,8 @@ Generate a developer-oriented prompt that:
     return new Response(JSON.stringify({ prompt: generatedPrompt, cached: false }), {
       headers: {
         "Content-Type": "application/json",
-        ...corsHeaders,
+        ...baseCorsHeaders,
+        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
       },
     });
   },

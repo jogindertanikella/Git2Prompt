@@ -2,24 +2,36 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
+    const origin = request.headers.get("Origin");
+
+    // Only allow these domains
+    const ALLOWED_ORIGINS = [
+      "https://git2prompt.com",
+      "https://www.git2prompt.com",
+    ];
+
+    let allowedOrigin = "";
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      allowedOrigin = origin;
+    }
 
     if (pathname === "/api/getOnlineVisitors") {
-      return await getOnlineVisitors(env);
+      return await getOnlineVisitors(env, allowedOrigin);
     }
 
     if (pathname === "/api/getAllVisitorStats") {
-      return await getAllVisitorStats(env);
+      return await getAllVisitorStats(env, allowedOrigin);
     }
 
     if (pathname === "/api/ping") {
-      return await trackVisitor(request, env);
+      return await trackVisitor(request, env, allowedOrigin);
     }
 
     return new Response("Not found", { status: 404 });
   }
 };
 
-async function trackVisitor(request, env) {
+async function trackVisitor(request, env, allowedOrigin) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const country = request.cf?.country || "??";
   const now = Date.now();
@@ -62,13 +74,13 @@ async function trackVisitor(request, env) {
     {
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
+        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {})
       }
     }
   );
 }
 
-async function getOnlineVisitors(env) {
+async function getOnlineVisitors(env, allowedOrigin) {
   const onlineList = await env.VISITOR_STATS.list({ prefix: "online:" });
   const onlineCount = onlineList.keys.length;
 
@@ -79,13 +91,13 @@ async function getOnlineVisitors(env) {
     {
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
+        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {})
       }
     }
   );
 }
 
-async function getAllVisitorStats(env) {
+async function getAllVisitorStats(env, allowedOrigin) {
   // Get total count
   const total = await env.VISITOR_STATS.get("total");
   const totalCount = parseInt(total || "0", 10);
@@ -116,7 +128,7 @@ async function getAllVisitorStats(env) {
     {
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
+        ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {})
       }
     }
   );
