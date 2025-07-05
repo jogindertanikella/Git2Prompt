@@ -1,5 +1,6 @@
 import { convertToGitHubSearchQuery } from "../src/utils/naturalsearch.js";
-import { ALLOWED_ORIGINS } from "../src/constants/allowedOrigins.js";
+import { getCorsHeaders } from "./corsHeaders.js";
+
 
 export default {
   async fetch(request, env, ctx) {

@@ -103,6 +103,9 @@ export default function App() {
       });
       const data = await res.json();
 
+
+          console.log("Search result:", data); // <-- Here is the log
+
       if (!data.items || data.items.length === 0) {
         setInfoMessage("❌ No results found.");
         setRepos([]);
@@ -122,7 +125,8 @@ export default function App() {
         setRepos(items.slice(0, 9));
         setRateLimit(data.rate || {});
       }
-    } catch {
+          } catch (error) {
+                console.error("Search error:", error); // <-- Also logs any error details
       setInfoMessage("⚠️ Something went wrong. Please try again.");
       setRepos([]);
       setTimeout(() => setInfoMessage(""), 3000);

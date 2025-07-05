@@ -48,13 +48,17 @@ export default function ControlsPanel({
                 setLoading,
               });
 
+
+          console.log("Spin result:", result); // <-- Here is the log
+
               if (!result.repos || result.repos.length === 0) {
                 setInfoMessage("❌ No results found.");
                 setSearchQuery("");
                 setRepos([]);
                 setTimeout(() => setInfoMessage(""), 3000);
               }
-            } catch {
+            } catch (error) {
+                console.error("Spin error:", error); // <-- Also logs any error details
               setInfoMessage("⚠️ Something went wrong during spin.");
               setSearchQuery("");
               setRepos([]);
