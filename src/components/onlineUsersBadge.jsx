@@ -19,12 +19,8 @@ export default function OnlineUsersBadge({ mode = "full" }) {
       }
     }
 
-    // Fetch immediately
     fetchStats();
-
-    // Refresh every 30 seconds
     intervalId = setInterval(fetchStats, 30000);
-
     return () => clearInterval(intervalId);
   }, []);
 
