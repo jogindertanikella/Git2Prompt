@@ -94,7 +94,7 @@ function MainApp() {
         return;
       }
 
-      const res = await fetch(`${API_URLS.QUERY}/api/checkqueryhistory`, {
+  const res = await fetch(`${API_URLS.QUERY}/api/delete-all-queries`);
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: clean }),

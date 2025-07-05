@@ -9,7 +9,7 @@ export default {
     const origin = request.headers.get("Origin") || "";
 
     const baseCorsHeaders = {
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
@@ -34,10 +34,7 @@ export default {
         if (!cleanQuery || cleanQuery.length < 3) {
           return new Response(JSON.stringify({ error: "Invalid or too short query" }), {
             status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
+            headers: { "Content-Type": "application/json", ...corsHeaders },
           });
         }
 
@@ -71,51 +68,32 @@ export default {
         }
 
         return new Response(JSON.stringify({ success: true }), {
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
+          headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
 
       // Get Last Queries
       if (request.method === "GET" && url.pathname === "/api/last-queries") {
-        try {
-          const list = await env.query_history_kv.list({ prefix: "query-" });
-          const values = await Promise.all(
-            list.keys.slice(-50).reverse().map((entry) =>
-              env.query_history_kv.get(entry.name, { type: "json" })
-            )
-          );
+        const list = await env.query_history_kv.list({ prefix: "query-" });
+        const values = await Promise.all(
+          list.keys
+            .slice(-50)
+            .reverse()
+            .map((entry) => env.query_history_kv.get(entry.name, { type: "json" }))
+        );
 
-          const uniqueRecent = values
-            .filter(Boolean)
-            .sort(
-              (a, b) =>
-                new Date(b.lastSeen || b.timestamp) - new Date(a.lastSeen || a.timestamp)
-            )
-            .slice(0, NUM_RECENT_QUERIES)
-            .map((v) => v.query);
+        const uniqueRecent = values
+          .filter(Boolean)
+          .sort(
+            (a, b) =>
+              new Date(b.lastSeen || b.timestamp) - new Date(a.lastSeen || a.timestamp)
+          )
+          .slice(0, NUM_RECENT_QUERIES)
+          .map((v) => v.query);
 
-          return new Response(JSON.stringify(uniqueRecent), {
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
-          });
-        } catch (err) {
-          console.error("last-queries error:", err);
-          return new Response(
-            JSON.stringify({ error: "Failed to load last queries" }),
-            {
-              status: 500,
-              headers: {
-                "Content-Type": "application/json",
-                ...corsHeaders,
-              },
-            }
-          );
-        }
+        return new Response(JSON.stringify(uniqueRecent), {
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
       }
 
       // Check Query History
@@ -124,10 +102,7 @@ export default {
         if (!query || query.length < 3) {
           return new Response(JSON.stringify({ error: "Invalid query" }), {
             status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
+            headers: { "Content-Type": "application/json", ...corsHeaders },
           });
         }
 
@@ -143,10 +118,7 @@ export default {
               query: cached.query,
             }),
             {
-              headers: {
-                "Content-Type": "application/json",
-                ...corsHeaders,
-              },
+              headers: { "Content-Type": "application/json", ...corsHeaders },
             }
           );
         }
@@ -187,10 +159,7 @@ export default {
         return new Response(
           JSON.stringify({ from: "fresh", items, query }),
           {
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
+            headers: { "Content-Type": "application/json", ...corsHeaders },
           }
         );
       }
@@ -201,10 +170,7 @@ export default {
         if (!query || query.length < 3) {
           return new Response(JSON.stringify({ error: "Invalid query" }), {
             status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
+            headers: { "Content-Type": "application/json", ...corsHeaders },
           });
         }
 
@@ -215,10 +181,7 @@ export default {
           return new Response(
             JSON.stringify({ from: "cache", query: existing.query }),
             {
-              headers: {
-                "Content-Type": "application/json",
-                ...corsHeaders,
-              },
+              headers: { "Content-Type": "application/json", ...corsHeaders },
             }
           );
         }
@@ -258,102 +221,72 @@ export default {
         return new Response(
           JSON.stringify({ from: "fresh", items, query }),
           {
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
+            headers: { "Content-Type": "application/json", ...corsHeaders },
           }
         );
       }
 
       // All query data dump
       if (request.method === "GET" && url.pathname === "/api/all-query-data") {
-        try {
-          const list = await env.query_history_kv.list({ prefix: "query-" });
-          const records = await Promise.all(
-            list.keys.map((entry) =>
-              env.query_history_kv.get(entry.name, { type: "json" })
-            )
+        const list = await env.query_history_kv.list({ prefix: "query-" });
+        const records = await Promise.all(
+          list.keys.map((entry) =>
+            env.query_history_kv.get(entry.name, { type: "json" })
+          )
+        );
+
+        const filtered = records
+          .filter(Boolean)
+          .sort(
+            (a, b) =>
+              new Date(b.lastSeen || b.timestamp) - new Date(a.lastSeen || a.timestamp)
           );
 
-          const filtered = records
-            .filter(Boolean)
-            .sort(
-              (a, b) =>
-                new Date(b.lastSeen || b.timestamp) - new Date(a.lastSeen || a.timestamp)
-            );
+        return new Response(JSON.stringify(filtered, null, 2), {
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
 
-          return new Response(JSON.stringify(filtered, null, 2), {
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
+      // GET to delete all queries
+      if (request.method === "GET" && url.pathname === "/api/delete-all-queries") {
+        let deletedCount = 0;
+        let cursor = undefined;
+
+        do {
+          const list = await env.query_history_kv.list({
+            prefix: "query-",
+            limit: 1000,
+            cursor,
           });
-        } catch (err) {
-          console.error("all-query-data error:", err);
-          return new Response(
-            JSON.stringify({ error: "Failed to load KV data" }),
-            {
-              status: 500,
-              headers: {
-                "Content-Type": "application/json",
-                ...corsHeaders,
-              },
+
+          if (list.keys.length > 0) {
+            const batches = [];
+            const chunkSize = 50;
+            for (let i = 0; i < list.keys.length; i += chunkSize) {
+              const chunk = list.keys.slice(i, i + chunkSize);
+              batches.push(
+                Promise.all(chunk.map((entry) => env.query_history_kv.delete(entry.name)))
+              );
             }
-          );
-        }
+            await Promise.all(batches);
+            deletedCount += list.keys.length;
+          }
+
+          cursor = list.cursor;
+        } while (cursor);
+
+        return new Response(
+          JSON.stringify({ success: true, deletedCount }),
+          {
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
       }
-
-
-// GET to delete all queries (safe batching)
-if (request.method === "GET" && url.pathname === "/api/delete-all-queries") {
-
-  let deletedCount = 0;
-  let cursor = undefined;
-
-  do {
-    const list = await env.query_history_kv.list({
-      prefix: "query-",
-      limit: 1000,
-      cursor,
-    });
-
-    if (list.keys.length > 0) {
-      // Batch delete in smaller chunks
-      const batches = [];
-      const chunkSize = 50;
-      for (let i = 0; i < list.keys.length; i += chunkSize) {
-        const chunk = list.keys.slice(i, i + chunkSize);
-        batches.push(Promise.all(chunk.map((entry) => env.query_history_kv.delete(entry.name))));
-      }
-      // Wait for all batches to complete
-      await Promise.all(batches);
-
-      deletedCount += list.keys.length;
-    }
-
-    cursor = list.cursor;
-  } while (cursor);
-
-  return new Response(
-    JSON.stringify({ success: true, deletedCount }),
-    {
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    }
-  );
-}
-
 
       // 404 Fallback
       return new Response(JSON.stringify({ error: "Not Found" }), {
         status: 404,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     } catch (err) {
       console.error("Unexpected error:", err);
@@ -361,10 +294,7 @@ if (request.method === "GET" && url.pathname === "/api/delete-all-queries") {
         JSON.stringify({ error: "Unexpected server error", detail: err.message }),
         {
           status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
+          headers: { "Content-Type": "application/json", ...corsHeaders },
         }
       );
     }

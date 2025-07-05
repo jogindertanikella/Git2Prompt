@@ -16,9 +16,7 @@ export default function DeleteAllQueries() {
     setError(null);
 
     try {
-      const res = await fetch(
-        "https://git2prompt-queryhistory.joginder-tanikella.workers.dev/api/delete-all-queries"
-      );
+  const res = await fetch(`${API_URLS.QUERY}/api/delete-all-queries`);
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }
