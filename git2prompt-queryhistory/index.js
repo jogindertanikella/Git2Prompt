@@ -1,9 +1,5 @@
 import { API_URLS } from "../src/constants/apicalls.js";
-
-const ALLOWED_ORIGINS = [
-  "https://git2prompt.com",
-  "https://www.git2prompt.com",
-];
+import { ALLOWED_ORIGINS } from "../src/constants/allowedOrigins.js";
 
 const NUM_RECENT_QUERIES = 12;
 

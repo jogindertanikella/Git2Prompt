@@ -1,7 +1,4 @@
-const ALLOWED_ORIGINS = [
-  "https://git2prompt.com",
-  "https://www.git2prompt.com",
-];
+import { ALLOWED_ORIGINS } from "../src/constants/allowedOrigins.js";
 
 export default {
   async fetch(request, env) {

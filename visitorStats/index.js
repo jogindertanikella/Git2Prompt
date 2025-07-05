@@ -1,14 +1,10 @@
+import { ALLOWED_ORIGINS } from "../src/constants/allowedOrigins.js";
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
     const origin = request.headers.get("Origin");
-
-    // Only allow these domains
-    const ALLOWED_ORIGINS = [
-      "https://git2prompt.com",
-      "https://www.git2prompt.com",
-    ];
 
     let allowedOrigin = "";
     if (ALLOWED_ORIGINS.includes(origin)) {
