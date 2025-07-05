@@ -69,7 +69,7 @@ async function trackVisitor(request, env, allowedOrigin) {
   return new Response(
     JSON.stringify({
       total: totalCount,
-      currentlyOnline: onlineCount
+      currentlyOnline: Math.max(1, onlineCount) // never show less than 1
     }),
     {
       headers: {
@@ -86,7 +86,7 @@ async function getOnlineVisitors(env, allowedOrigin) {
 
   return new Response(
     JSON.stringify({
-      currentlyOnline: onlineCount
+      currentlyOnline: Math.max(1, onlineCount) // never show less than 1
     }),
     {
       headers: {
