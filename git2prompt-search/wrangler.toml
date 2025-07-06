@@ -7,8 +7,7 @@ routes = [
 ]
 
 
-[vars]
-GITHUB_SEARCH_TOKEN = "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"
+
 
 [[kv_namespaces]]
 binding = "visitor_count_kv"
