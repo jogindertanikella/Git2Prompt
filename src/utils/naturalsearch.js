@@ -1,21 +1,25 @@
 import nlp from "compromise";
 
-// Keep your STOP_WORDS, LANGUAGES, TOPIC_KEYWORDS, SYNONYMS, levenshtein, closestMatch, normalize
-
 export function convertToGitHubSearchQuery(input) {
   const clean = input.trim().toLowerCase();
   const params = [];
 
   const doc = nlp(clean);
-  const nounTerms = doc.nouns().out("array"); // nouns like "resume", "parser", "docker"
-  const verbTerms = doc.verbs().out("array"); // verbs like "deploy", "build"
+  const nounTerms = doc.nouns().out("array");
+  const verbTerms = doc.verbs().out("array");
 
-  const tokens = [...nounTerms, ...verbTerms].map(normalize).filter(Boolean);
+  const QUESTION_WORDS = new Set(["how", "what", "which", "can", "could", "should", "would", "is", "are", "do", "does", "did"]);
+
+  const tokens = [...nounTerms, ...verbTerms]
+    .map(t => t.toLowerCase())
+    .map(normalize)
+    .filter(Boolean)
+    .filter(w => !QUESTION_WORDS.has(w));
 
   const matchedTopics = new Set();
   const matchedLanguages = new Set();
 
-  // --- Stars ---
+  // Stars
   const starMatch = clean.match(/stars?\s*[:>=<]+\s*\d+/);
   if (starMatch) {
     const cleanedStar = starMatch[0].replace(/\s+/g, "").replace("stars", "stars");
@@ -24,7 +28,7 @@ export function convertToGitHubSearchQuery(input) {
     params.push("stars:>500");
   }
 
-  // --- Synonym-based mapping ---
+  // Synonyms
   tokens.forEach(token => {
     const mapped = SYNONYMS[token];
     if (mapped && TOPIC_KEYWORDS[mapped]) {
@@ -32,7 +36,7 @@ export function convertToGitHubSearchQuery(input) {
     }
   });
 
-  // --- Fuzzy match language ---
+  // Fuzzy language
   tokens.forEach(token => {
     const match = closestMatch(token, LANGUAGES);
     if (LANGUAGES.includes(match)) {
@@ -40,7 +44,7 @@ export function convertToGitHubSearchQuery(input) {
     }
   });
 
-  // --- Fuzzy match topics ---
+  // Fuzzy topic
   const allKeywords = Object.entries(TOPIC_KEYWORDS).flatMap(([topic, list]) =>
     list.map(keyword => ({ keyword, topic }))
   );
@@ -51,7 +55,7 @@ export function convertToGitHubSearchQuery(input) {
     }
   });
 
-  // --- Keywords ---
+  // Keywords filtering
   const knownWords = new Set([
     ...LANGUAGES,
     ...Object.keys(SYNONYMS),
@@ -60,15 +64,10 @@ export function convertToGitHubSearchQuery(input) {
   ]);
 
   const finalKeywords = tokens.filter(
-    w =>
-      w.length > 2 &&
-      !STOP_WORDS.has(w) &&
-      !knownWords.has(w)
+    w => w.length > 2 && !STOP_WORDS.has(w) && !knownWords.has(w)
   );
 
-  // --- Build final query ---
   if (finalKeywords.length) {
-    // Only keep up to 2 keywords to avoid noise
     params.unshift(finalKeywords.slice(0, 2).join(" "));
   }
 
