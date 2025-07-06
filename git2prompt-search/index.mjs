@@ -1,3 +1,5 @@
+//git2prompt-search
+
 import { convertToGitHubSearchQuery } from "../src/utils/naturalsearch.js";
 import { getCorsHeaders } from "../src/constants/corsHeaders.js";
 
@@ -19,7 +21,7 @@ export default {
       // Accept only POST
       if (request.method !== "POST") {
         return new Response(
-          JSON.stringify({ error: "Method Not Allowed" }),
+          JSON.stringify({ error: "Method Not Allowed", step: "method check" }),
           {
             status: 405,
             headers: {
@@ -35,7 +37,7 @@ export default {
         const { query } = await request.json();
         if (!query || query.trim().length < 3) {
           return new Response(
-            JSON.stringify({ error: "Invalid or too short query" }),
+            JSON.stringify({ error: "Invalid or too short query", step: "searchfromspintext validation" }),
             {
               status: 400,
               headers: {
@@ -59,7 +61,12 @@ export default {
         });
 
         const data = await response.json();
-        return new Response(JSON.stringify(data), {
+        return new Response(JSON.stringify({
+          ...data,
+          step: "searchfromspintext success",
+          originalQuery: query,
+          convertedQuery: query.trim()
+        }), {
           status: 200,
           headers: {
             ...corsHeaders,
@@ -73,7 +80,7 @@ export default {
         const { query } = await request.json();
         if (!query || query.trim().length < 3) {
           return new Response(
-            JSON.stringify({ error: "Invalid or too short query" }),
+            JSON.stringify({ error: "Invalid or too short query", step: "search validation" }),
             {
               status: 400,
               headers: {
@@ -99,7 +106,12 @@ export default {
         });
 
         const data = await response.json();
-        return new Response(JSON.stringify(data), {
+        return new Response(JSON.stringify({
+          ...data,
+          step: "search success",
+          originalQuery: query,
+          convertedQuery: githubQuery
+        }), {
           status: 200,
           headers: {
             ...corsHeaders,
@@ -110,7 +122,7 @@ export default {
 
       // Fallback for other POST routes
       return new Response(
-        JSON.stringify({ error: "Not Found" }),
+        JSON.stringify({ error: "Not Found", step: "fallback not found" }),
         {
           status: 404,
           headers: {
@@ -122,7 +134,7 @@ export default {
     } catch (err) {
       console.error("Unexpected server error:", err);
       return new Response(
-        JSON.stringify({ error: "Server error", detail: err.message }),
+        JSON.stringify({ error: "Server error", detail: err.message, step: "catch block" }),
         {
           status: 500,
           headers: {

@@ -1,3 +1,5 @@
+      // git2prompt-queryhistory
+
 import { API_URLS } from "../src/constants/apicalls.js";
 import { ALLOWED_ORIGINS } from "../src/constants/allowedOrigins.js";
 
@@ -32,7 +34,7 @@ export default {
         const { query } = await request.json();
         const cleanQuery = query?.trim().toLowerCase();
         if (!cleanQuery || cleanQuery.length < 3) {
-          return new Response(JSON.stringify({ error: "Invalid or too short query" }), {
+          return new Response(JSON.stringify({ error: "Invalid or too short query", step: "store-query validation" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
           });
@@ -67,7 +69,7 @@ export default {
           );
         }
 
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ success: true, step: "store-query save" }), {
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
@@ -91,7 +93,7 @@ export default {
           .slice(0, NUM_RECENT_QUERIES)
           .map((v) => v.query);
 
-        return new Response(JSON.stringify(uniqueRecent), {
+        return new Response(JSON.stringify({ queries: uniqueRecent, step: "last-queries" }), {
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
@@ -100,7 +102,7 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/checkqueryhistory") {
         const { query } = await request.json();
         if (!query || query.length < 3) {
-          return new Response(JSON.stringify({ error: "Invalid query" }), {
+          return new Response(JSON.stringify({ error: "Invalid query", step: "checkqueryhistory validation" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
           });
@@ -116,6 +118,7 @@ export default {
               items: cached.items,
               timestamp: cached.timestamp,
               query: cached.query,
+              step: "checkqueryhistory cache hit"
             }),
             {
               headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -133,31 +136,14 @@ export default {
         const data = await githubRes.json();
         const items = data.items || [];
 
-        if (items.length > 0) {
-          const now = new Date().toISOString();
-          const geo = request.cf || {};
-          const originIp = request.headers.get("cf-connecting-ip") || "unknown";
-
-          const record = {
-            query,
-            count: 1,
-            timestamp: now,
-            lastSeen: now,
-            origin: originIp,
-            items,
-            geo: {
-              country: geo.country || "unknown",
-              region: geo.region || "unknown",
-              city: geo.city || "unknown",
-              colo: geo.colo || "unknown",
-            },
-          };
-
-          await env.query_history_kv.put(queryKey, JSON.stringify(record));
-        }
-
         return new Response(
-          JSON.stringify({ from: "fresh", items, query }),
+          JSON.stringify({
+            from: "fresh",
+            items,
+            query,
+            convertedQuery: data.convertedQuery || "(not returned)",
+            step: "checkqueryhistory fresh fallback"
+          }),
           {
             headers: { "Content-Type": "application/json", ...corsHeaders },
           }
@@ -168,7 +154,7 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/fallback") {
         const { query } = await request.json();
         if (!query || query.length < 3) {
-          return new Response(JSON.stringify({ error: "Invalid query" }), {
+          return new Response(JSON.stringify({ error: "Invalid query", step: "fallback validation" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
           });
@@ -179,7 +165,7 @@ export default {
 
         if (existing) {
           return new Response(
-            JSON.stringify({ from: "cache", query: existing.query }),
+            JSON.stringify({ from: "cache", query: existing.query, step: "fallback cache hit" }),
             {
               headers: { "Content-Type": "application/json", ...corsHeaders },
             }
@@ -195,31 +181,14 @@ export default {
         const data = await githubRes.json();
         const items = data.items || [];
 
-        if (items.length > 0) {
-          const now = new Date().toISOString();
-          const geo = request.cf || {};
-          const originIp = request.headers.get("cf-connecting-ip") || "unknown";
-
-          const record = {
-            query,
-            count: 1,
-            timestamp: now,
-            lastSeen: now,
-            origin: originIp,
-            items,
-            geo: {
-              country: geo.country || "unknown",
-              region: geo.region || "unknown",
-              city: geo.city || "unknown",
-              colo: geo.colo || "unknown",
-            },
-          };
-
-          await env.query_history_kv.put(queryKey, JSON.stringify(record));
-        }
-
         return new Response(
-          JSON.stringify({ from: "fresh", items, query }),
+          JSON.stringify({
+            from: "fresh",
+            items,
+            query,
+            convertedQuery: data.convertedQuery || "(not returned)",
+            step: "fallback fresh fallback"
+          }),
           {
             headers: { "Content-Type": "application/json", ...corsHeaders },
           }
@@ -242,7 +211,7 @@ export default {
               new Date(b.lastSeen || b.timestamp) - new Date(a.lastSeen || a.timestamp)
           );
 
-        return new Response(JSON.stringify(filtered, null, 2), {
+        return new Response(JSON.stringify({ records: filtered, step: "all-query-data" }), {
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
@@ -276,7 +245,7 @@ export default {
         } while (cursor);
 
         return new Response(
-          JSON.stringify({ success: true, deletedCount }),
+          JSON.stringify({ success: true, deletedCount, step: "delete-all-queries" }),
           {
             headers: { "Content-Type": "application/json", ...corsHeaders },
           }
@@ -284,14 +253,14 @@ export default {
       }
 
       // 404 Fallback
-      return new Response(JSON.stringify({ error: "Not Found" }), {
+      return new Response(JSON.stringify({ error: "Not Found", step: "fallback 404" }), {
         status: 404,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     } catch (err) {
       console.error("Unexpected error:", err);
       return new Response(
-        JSON.stringify({ error: "Unexpected server error", detail: err.message }),
+        JSON.stringify({ error: "Unexpected server error", detail: err.message, step: "catch block" }),
         {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },
