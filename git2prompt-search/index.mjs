@@ -1,6 +1,6 @@
 //git2prompt-search
 
-import { convertToGitHubSearchQuery } from "../src/utils/naturalsearch.js";
+import { convertToGitHubSearchQueryWithNLP } from "../src/utils/nlpSearch.js";
 import { getCorsHeaders } from "../src/constants/corsHeaders.js";
 
 export default {
@@ -91,7 +91,7 @@ export default {
           );
         }
 
-        const githubQuery = convertToGitHubSearchQuery(query);
+        const githubQuery = convertToGitHubSearchQueryWithNLP(query);
 
         const githubApiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
           githubQuery
