@@ -1,7 +1,16 @@
+import nlp from "compromise";
+
+// Keep your STOP_WORDS, LANGUAGES, TOPIC_KEYWORDS, SYNONYMS, levenshtein, closestMatch, normalize
+
 export function convertToGitHubSearchQuery(input) {
   const clean = input.trim().toLowerCase();
   const params = [];
-  const tokens = clean.split(/\W+/).map(normalize).filter(Boolean);
+
+  const doc = nlp(clean);
+  const nounTerms = doc.nouns().out("array"); // nouns like "resume", "parser", "docker"
+  const verbTerms = doc.verbs().out("array"); // verbs like "deploy", "build"
+
+  const tokens = [...nounTerms, ...verbTerms].map(normalize).filter(Boolean);
 
   const matchedTopics = new Set();
   const matchedLanguages = new Set();
@@ -42,9 +51,6 @@ export function convertToGitHubSearchQuery(input) {
     }
   });
 
-  // --- Remove generic question words ---
-  const QUESTION_WORDS = new Set(["how", "what", "which", "can", "could", "should", "would", "is", "are", "do", "does", "did"]);
-
   // --- Keywords ---
   const knownWords = new Set([
     ...LANGUAGES,
@@ -55,9 +61,9 @@ export function convertToGitHubSearchQuery(input) {
 
   const finalKeywords = tokens.filter(
     w =>
+      w.length > 2 &&
       !STOP_WORDS.has(w) &&
-      !knownWords.has(w) &&
-      !QUESTION_WORDS.has(w)
+      !knownWords.has(w)
   );
 
   // --- Build final query ---
