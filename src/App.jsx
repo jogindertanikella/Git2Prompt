@@ -27,7 +27,7 @@ function MainApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [repos, setRepos] = useState(fallbackRepos);
   const [loading, setLoading] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [spinCount, setSpinCount] = useState(null);
   const [rateLimit, setRateLimit] = useState(null);
   const [modalPrompt, setModalPrompt] = useState("");
@@ -77,19 +77,25 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-    if (loading || searchLoading) {
+    if (loading) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
-  }, [loading, searchLoading]);
+  }, [loading]);
 
   const triggerSearch = async (input) => {
     const clean = input?.trim();
     if (!clean || clean.length < 3) return;
 
     setSearchQuery(clean);
-    setSearchLoading(true);
+
+    if (isValidGithubUrl(clean)) {
+      setLoadingMessage("Generating prompt...");
+    } else {
+      setLoadingMessage("Fetching repositories...");
+    }
+    setLoading(true);
 
     try {
       if (isValidGithubUrl(clean)) {
@@ -137,7 +143,7 @@ function MainApp() {
       setRepos([]);
       setTimeout(() => setInfoMessage(""), 3000);
     } finally {
-      setSearchLoading(false);
+      setLoading(false);
     }
   };
 
@@ -151,7 +157,7 @@ function MainApp() {
         setSearchQuery={setSearchQuery}
         triggerSearch={triggerSearch}
         loading={loading}
-        searchLoading={searchLoading}
+        searchLoading={loading}
         rotatingQuery={rotatingQuery}
         typedQuery={typedQuery}
       />
@@ -164,7 +170,7 @@ function MainApp() {
         spin={spin}
         triggerSearch={triggerSearch}
         loading={loading}
-        searchLoading={searchLoading}
+        searchLoading={loading}
         setSearchQuery={setSearchQuery}
         setRepos={setRepos}
         setRateLimit={setRateLimit}
@@ -211,9 +217,7 @@ function MainApp() {
         <OnlineUsersBadge mode="minimal" />
       </StickyFooter>
 
-      {(loading || searchLoading) && (
-        <GlobalLoadingOverlay message="Fetching repositories..." />
-      )}
+      {loading && <GlobalLoadingOverlay message={loadingMessage || "Loading..."} />}
     </div>
   );
 }
