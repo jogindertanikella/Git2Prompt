@@ -16,6 +16,7 @@ import StickyFooter from "./components/stickyFooter";
 import SearchBox from "./components/searchBox";
 import HeaderBar from "./components/headerBar";
 import ControlPanel from "./components/controlPanel";
+import GlobalLoadingOverlay from "./components/GlobalLoadingOverlay";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DeleteAllQueries from "./pages/DeleteAllQueries";
 
@@ -74,6 +75,14 @@ function MainApp() {
     const intervalId = setInterval(ping, 2 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (loading || searchLoading) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+  }, [loading, searchLoading]);
 
   const triggerSearch = async (input) => {
     const clean = input?.trim();
@@ -174,9 +183,7 @@ function MainApp() {
           </div>
         ) : (
           <div
-            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 ${
-              loading || searchLoading ? "opacity-40 pointer-events-none blur-sm" : ""
-            }`}
+            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6`}
           >
             {repos.map((repo) => (
               <RepoCard
@@ -203,6 +210,10 @@ function MainApp() {
       <StickyFooter>
         <OnlineUsersBadge mode="minimal" />
       </StickyFooter>
+
+      {(loading || searchLoading) && (
+        <GlobalLoadingOverlay message="Fetching repositories..." />
+      )}
     </div>
   );
 }
