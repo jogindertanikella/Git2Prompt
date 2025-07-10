@@ -116,7 +116,7 @@ function MainApp() {
       });
       const data = await res.json();
 
-      console.log("Search result:", data);
+   //   console.log("Search result:", data);
 
       if (!data.items || data.items.length === 0) {
         setInfoMessage("❌ No results found.");
