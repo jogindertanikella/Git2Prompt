@@ -192,14 +192,17 @@ function MainApp() {
             className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6`}
           >
             {repos.map((repo) => (
-              <RepoCard
-                key={repo.id}
-                repo={repo}
-                disabledRepoId={disabledRepoId}
-                setDisabledRepoId={setDisabledRepoId}
-                setModalPrompt={setModalPrompt}
-                setShowModal={setShowModal}
-              />
+<RepoCard
+  key={repo.id}
+  repo={repo}
+  disabledRepoId={disabledRepoId}
+  setDisabledRepoId={setDisabledRepoId}
+  setModalPrompt={setModalPrompt}
+  setShowModal={setShowModal}
+  setLoading={setLoading}
+  setLoadingMessage={setLoadingMessage}
+/>
+
             ))}
           </div>
         )}

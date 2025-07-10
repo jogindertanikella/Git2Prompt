@@ -9,6 +9,8 @@ export default function RepoCard({
   setDisabledRepoId,
   setModalPrompt,
   setShowModal,
+  setLoading,
+  setLoadingMessage,
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -43,52 +45,28 @@ export default function RepoCard({
           GitHub ↗
         </a>
         <button
-          disabled={!!disabledRepoId}
-          onClick={() =>
+          onClick={() => {
+            setLoading(true);
+            setLoadingMessage("Generating prompt...");
             handlePrompt({
               id: repo.id,
               url: repo.html_url,
               setDisabledRepoId,
               setModalPrompt,
               setShowModal,
-            })
-          }
-          className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
-            disabledRepoId === repo.id
-              ? "bg-yellow-400 text-black"
-              : "bg-yellow-500 text-black hover:bg-yellow-400"
-          }`}
+            }).finally(() => {
+              setLoading(false);
+              setLoadingMessage("");
+            });
+          }}
+          className="px-3 py-1 rounded text-sm flex items-center gap-1 bg-yellow-500 text-black hover:bg-yellow-400"
         >
-          {disabledRepoId === repo.id ? (
-            <>
-              <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8H4z"
-                />
-              </svg>
-              Loading...
-            </>
-          ) : (
-            <>
-              <img
-                src="/images/git2prompt.png"
-                alt="Git2Prompt"
-                className="w-4 h-4 mr-1 rounded-lg"
-              />
-              Git2Prompt
-            </>
-          )}
+          <img
+            src="/images/git2prompt.png"
+            alt="Git2Prompt"
+            className="w-4 h-4 mr-1 rounded-lg"
+          />
+          Git2Prompt
         </button>
       </div>
 
