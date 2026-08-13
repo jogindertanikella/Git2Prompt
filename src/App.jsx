@@ -18,6 +18,8 @@ import HeaderBar from "./components/headerBar";
 import ControlPanel from "./components/controlPanel";
 import GlobalLoadingOverlay from "./components/GlobalLoadingOverlay";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import DeleteAllQueries from "./pages/DeleteAllQueries";
 
 function MainApp() {
@@ -228,6 +230,8 @@ function MainApp() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Analytics />
+      <SpeedInsights />
       <Routes>
         <Route path="/" element={<MainApp />} />
         <Route path="/delete-all-queries" element={<DeleteAllQueries />} />

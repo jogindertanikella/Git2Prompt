@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "compromise": "^14.14.4",
     "daisyui": "^5.0.43",
     "prop-types": "^15.8.1",
