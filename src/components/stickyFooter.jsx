@@ -11,7 +11,15 @@ export default function StickyFooter() {
 
         {/* Made with text */}
         <div className="flex items-center justify-center">
-          Made with ❤️ by Joginder Tanikella. © 2025
+          Made with ❤️ by{" "}
+          <a
+            href="https://www.jogindertanikella.com/?utm_source=git2prompt&utm_medium=referral&utm_campaign=portfolio_network"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Joginder Tanikella
+          </a>
+          . © 2025
         </div>
 
         {/* Social Icons */}
