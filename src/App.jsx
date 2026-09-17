@@ -57,6 +57,19 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://citizen404.vercel.app/c.js";
+    script.async = true;
+    script.dataset.site = "e69f1ba03fec1628ab4b4f3803241db3";
+    script.dataset.position = "bottom-right";
+    document.body.appendChild(script);
+
+    return () => {
+      script.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     const handleKey = (e) => {
       if (e.key === "/" && document.activeElement !== inputRef.current) {
         e.preventDefault();
