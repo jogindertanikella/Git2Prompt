@@ -58,9 +58,9 @@ function MainApp() {
 
   useEffect(() => {
     const script = document.createElement("script");
-    script.src = "https://citizen404.vercel.app/c.js";
+    script.src = "https://citizen404.com/c.js";
     script.async = true;
-    script.dataset.site = "e69f1ba03fec1628ab4b4f3803241db3";
+    script.dataset.site = "e7B_MzHLE3qJmA5FPjd494iYUv0Zjos_";
     script.dataset.position = "bottom-right";
     document.body.appendChild(script);
 
