@@ -56,6 +56,7 @@ function MainApp() {
     fetchSpinCount(setSpinCount);
   }, []);
 
+  /* Citizen404 paused.
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://citizen404.com/c.js";
@@ -68,6 +69,7 @@ function MainApp() {
       script.remove();
     };
   }, []);
+  */
 
   useEffect(() => {
     const handleKey = (e) => {
